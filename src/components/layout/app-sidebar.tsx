@@ -15,7 +15,6 @@ import {
   Wrench,
   BarChart3,
   Settings,
-  ChevronRight,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,7 +28,8 @@ import {
   SidebarFooter,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
+import { SidebarUser } from "@/components/layout/sidebar-user";
+import type { Session } from "next-auth";
 
 const navMain = [
   {
@@ -75,7 +75,7 @@ const navMain = [
   },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ user }: { user?: Session["user"] }) {
   const pathname = usePathname();
 
   return (
@@ -118,7 +118,7 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border">
+      <SidebarFooter className="border-t border-sidebar-border space-y-1 pb-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -131,6 +131,11 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <SidebarUser
+          name={user?.name}
+          email={user?.email}
+          image={user?.image}
+        />
       </SidebarFooter>
 
       <SidebarRail />
