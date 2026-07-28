@@ -125,26 +125,41 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.categoryId) {
+      toast.error("Please select a vehicle category")
+      return
+    }
+    const year = parseInt(form.year, 10)
+    const seats = parseInt(form.seats, 10)
+    if (isNaN(year) || year < 1990 || year > new Date().getFullYear() + 1) {
+      toast.error("Enter a valid year")
+      return
+    }
+    if (isNaN(seats) || seats < 1) {
+      toast.error("Enter a valid seat count")
+      return
+    }
     startTransition(async () => {
       try {
         await createVehicle({
           make: form.make,
           model: form.model,
-          year: parseInt(form.year, 10),
+          year,
           colour: form.colour,
           registrationNo: form.registrationNo,
           categoryId: form.categoryId,
           fuelType: form.fuelType,
           transmission: form.transmission,
-          seats: parseInt(form.seats, 10),
+          seats,
           vin: form.vin || undefined,
           notes: form.notes || undefined,
         })
         toast.success("Vehicle added successfully")
         setOpen(false)
         resetForm()
-      } catch {
-        toast.error("Failed to add vehicle")
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to add vehicle"
+        toast.error(msg.includes("Unique constraint") ? "Registration number already exists" : "Failed to add vehicle")
       }
     })
   }
