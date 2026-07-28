@@ -1,0 +1,434 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── Fleet ───────────────────────────────────────────────────────────────────
+
+model VehicleCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  vehicles    Vehicle[]
+  rates       RentalRate[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Vehicle {
+  id             String          @id @default(cuid())
+  make           String
+  model          String
+  year           Int
+  colour         String
+  registrationNo String          @unique
+  vin            String?         @unique
+  fuelType       FuelType
+  transmission   Transmission
+  seats          Int
+  status         VehicleStatus   @default(AVAILABLE)
+  odometer       Float           @default(0)
+  notes          String?
+  categoryId     String
+  category       VehicleCategory @relation(fields: [categoryId], references: [id])
+  photos         VehiclePhoto[]
+  documents      VehicleDocument[]
+  bookings       Booking[]
+  maintenance    MaintenanceRecord[]
+  damageReports  DamageReport[]
+  calendarBlocks CalendarBlock[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model VehiclePhoto {
+  id        String  @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  url       String
+  isPrimary Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+
+model VehicleDocument {
+  id         String       @id @default(cuid())
+  vehicleId  String
+  vehicle    Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  type       DocumentType
+  number     String?
+  expiryDate DateTime?
+  fileUrl    String?
+  createdAt  DateTime     @default(now())
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  BOOKED
+  MAINTENANCE
+  DAMAGED
+  RETIRED
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  HYBRID
+  ELECTRIC
+  LPG
+}
+
+enum Transmission {
+  AUTOMATIC
+  MANUAL
+}
+
+enum DocumentType {
+  REGISTRATION
+  INSURANCE
+  ROADWORTHY
+  OTHER
+}
+
+// ─── Customers ───────────────────────────────────────────────────────────────
+
+model Customer {
+  id              String    @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String    @unique
+  phone           String
+  address         String?
+  city            String?
+  state           String?
+  postcode        String?
+  dateOfBirth     DateTime?
+  licenceNo       String?
+  licenceState    String?
+  licenceClass    String?
+  licenceExpiry   DateTime?
+  isBlacklisted   Boolean   @default(false)
+  blacklistReason String?
+  isCorporate     Boolean   @default(false)
+  companyName     String?
+  abn             String?
+  notes           String?
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ─── Bookings ────────────────────────────────────────────────────────────────
+
+model Booking {
+  id               String        @id @default(cuid())
+  bookingNumber    String        @unique
+  customerId       String
+  customer         Customer      @relation(fields: [customerId], references: [id])
+  vehicleId        String
+  vehicle          Vehicle       @relation(fields: [vehicleId], references: [id])
+  pickupDate       DateTime
+  returnDate       DateTime
+  actualReturnDate DateTime?
+  pickupLocation   String
+  returnLocation   String?
+  status           BookingStatus @default(PENDING)
+  source           BookingSource @default(WALK_IN)
+  notes            String?
+  discountCode     String?
+  discountAmount   Float         @default(0)
+  extras           BookingExtra[]
+  contract         Contract?
+  payments         Payment[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model BookingExtra {
+  id        String  @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  extraId   String
+  extra     Extra   @relation(fields: [extraId], references: [id])
+  quantity  Int     @default(1)
+  unitPrice Float
+}
+
+model Extra {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  pricePerDay Float
+  isActive    Boolean        @default(true)
+  bookings    BookingExtra[]
+  createdAt   DateTime       @default(now())
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingSource {
+  WALK_IN
+  PHONE
+  WEB
+  THIRD_PARTY
+}
+
+// ─── Contracts ───────────────────────────────────────────────────────────────
+
+model Contract {
+  id                  String         @id @default(cuid())
+  contractNumber      String         @unique
+  bookingId           String         @unique
+  booking             Booking        @relation(fields: [bookingId], references: [id])
+  status              ContractStatus @default(DRAFT)
+  signedAt            DateTime?
+  customerSignature   String?
+  preRentalFuelLevel  FuelLevel?
+  postRentalFuelLevel FuelLevel?
+  preConditionNotes   String?
+  postConditionNotes  String?
+  preConditionPhotos  String?
+  postConditionPhotos String?
+  totalAmount         Float
+  depositAmount       Float
+  depositPaid         Float          @default(0)
+  closedAt            DateTime?
+  damageReports       DamageReport[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+enum ContractStatus {
+  DRAFT
+  SIGNED
+  ACTIVE
+  CLOSED
+  DISPUTED
+}
+
+enum FuelLevel {
+  EMPTY
+  QUARTER
+  HALF
+  THREE_QUARTER
+  FULL
+}
+
+// ─── Pricing ─────────────────────────────────────────────────────────────────
+
+model RentalRate {
+  id          String          @id @default(cuid())
+  categoryId  String
+  category    VehicleCategory @relation(fields: [categoryId], references: [id])
+  name        String
+  dailyRate   Float
+  weeklyRate  Float?
+  monthlyRate Float?
+  startDate   DateTime?
+  endDate     DateTime?
+  isDefault   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model DiscountCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  description String?
+  discountPct Float?
+  discountAmt Float?
+  usageLimit  Int?
+  usedCount   Int       @default(0)
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+}
+
+// ─── Payments & Invoices ─────────────────────────────────────────────────────
+
+model Payment {
+  id        String        @id @default(cuid())
+  bookingId String
+  booking   Booking       @relation(fields: [bookingId], references: [id])
+  amount    Float
+  type      PaymentType
+  method    PaymentMethod
+  reference String?
+  notes     String?
+  createdAt DateTime      @default(now())
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  bookingId     String
+  subtotal      Float
+  taxRate       Float         @default(0.1)
+  taxAmount     Float
+  totalAmount   Float
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum PaymentType {
+  DEPOSIT
+  RENTAL_FEE
+  EXTRA_CHARGE
+  DAMAGE_CHARGE
+  FUEL_CHARGE
+  LATE_RETURN
+  REFUND
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  ONLINE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+// ─── Damage & Incidents ──────────────────────────────────────────────────────
+
+model DamageReport {
+  id             String       @id @default(cuid())
+  vehicleId      String
+  vehicle        Vehicle      @relation(fields: [vehicleId], references: [id])
+  contractId     String?
+  contract       Contract?    @relation(fields: [contractId], references: [id])
+  description    String
+  photos         String?
+  faultType      FaultType?
+  repairCost     Float?
+  chargedAmount  Float?
+  insuranceClaim Boolean      @default(false)
+  claimNumber    String?
+  status         DamageStatus @default(REPORTED)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum FaultType {
+  CUSTOMER
+  THIRD_PARTY
+  NO_FAULT
+  UNKNOWN
+}
+
+enum DamageStatus {
+  REPORTED
+  ASSESSED
+  REPAIR_IN_PROGRESS
+  REPAIRED
+  CLAIM_FILED
+  RESOLVED
+}
+
+// ─── Maintenance ─────────────────────────────────────────────────────────────
+
+model MaintenanceRecord {
+  id                String            @id @default(cuid())
+  vehicleId         String
+  vehicle           Vehicle           @relation(fields: [vehicleId], references: [id])
+  type              MaintenanceType
+  description       String?
+  scheduledDate     DateTime
+  completedDate     DateTime?
+  odometerAtService Float?
+  cost              Float?
+  vendor            String?
+  status            MaintenanceStatus @default(SCHEDULED)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+enum MaintenanceType {
+  SERVICE
+  REGISTRATION
+  ROADWORTHY
+  TYRES
+  REPAIR
+  CLEANING
+  OTHER
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ─── Calendar Blocks ─────────────────────────────────────────────────────────
+
+model CalendarBlock {
+  id        String   @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+// ─── Locations ───────────────────────────────────────────────────────────────
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  city      String
+  state     String
+  postcode  String
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Staff ───────────────────────────────────────────────────────────────────
+
+model Staff {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  role      StaffRole @default(AGENT)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum StaffRole {
+  ADMIN
+  AGENT
+  MECHANIC
+}
+
+// ─── Settings ────────────────────────────────────────────────────────────────
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
