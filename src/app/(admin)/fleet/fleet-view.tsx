@@ -379,7 +379,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
                             <Eye className="h-4 w-4" />
                             View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => openEdit(vehicle)}>
+                          <DropdownMenuItem onClick={() => setTimeout(() => openEdit(vehicle), 0)}>
                             <Pencil className="h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
