@@ -1,17 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
   DollarSign,
   AlertCircle,
-  Clock,
-  Receipt,
-  Download,
-  Send,
-  Eye,
+  CreditCard,
+  Banknote,
   Plus,
+  Receipt,
 } from "lucide-react"
 import { toast } from "sonner"
+import type { Payment, Booking, Customer, PaymentType, PaymentMethod } from "@/generated/prisma"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -43,151 +42,132 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet"
 
-type Payment = {
-  id: string
-  bookingId: string
-  customer: string
-  amount: number
-  type: string
-  method: string
-  date: string
+import { createPayment } from "./actions"
+
+type PaymentRow = Payment & { booking: Booking & { customer: Customer } }
+type BookingOption = Booking & { customer: Customer }
+
+const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
+  DEPOSIT: "Deposit",
+  RENTAL_FEE: "Rental Fee",
+  EXTRA_CHARGE: "Extra Charge",
+  DAMAGE_CHARGE: "Damage Charge",
+  FUEL_CHARGE: "Fuel Charge",
+  LATE_RETURN: "Late Return",
+  REFUND: "Refund",
 }
 
-type Invoice = {
-  id: string
-  bookingId: string
-  subtotal: number
-  gst: number
-  total: number
-  status: string
-  dueDate: string
+const PAYMENT_TYPE_STYLES: Record<PaymentType, string> = {
+  DEPOSIT: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  RENTAL_FEE: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  EXTRA_CHARGE: "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  DAMAGE_CHARGE: "bg-red-500/15 text-red-400 border-red-500/30",
+  FUEL_CHARGE: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+  LATE_RETURN: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  REFUND: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
 }
 
-type Outstanding = {
-  bookingId: string
-  customer: string
-  vehicle: string
-  balance: number
-  dueDate: string
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CASH: "Cash",
+  CARD: "Card",
+  BANK_TRANSFER: "Bank Transfer",
+  ONLINE: "Online",
 }
 
-function paymentTypeBadge(type: string) {
-  const map: Record<string, string> = {
-    DEPOSIT: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-    RENTAL_FEE: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    DAMAGE_FEE: "bg-red-500/15 text-red-400 border-red-500/30",
-    LATE_FEE: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-  }
-  const label: Record<string, string> = {
-    DEPOSIT: "Deposit",
-    RENTAL_FEE: "Rental Fee",
-    DAMAGE_FEE: "Damage Fee",
-    LATE_FEE: "Late Fee",
-  }
+const PAYMENT_METHOD_STYLES: Record<PaymentMethod, string> = {
+  CARD: "bg-violet-500/15 text-violet-400 border-violet-500/30",
+  CASH: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  BANK_TRANSFER: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+  ONLINE: "bg-teal-500/15 text-teal-400 border-teal-500/30",
+}
+
+function TypeBadge({ type }: { type: PaymentType }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${map[type] ?? "bg-muted text-muted-foreground border-border"}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${PAYMENT_TYPE_STYLES[type]}`}
     >
-      {label[type] ?? type}
+      {PAYMENT_TYPE_LABELS[type]}
     </span>
   )
 }
 
-function methodBadge(method: string) {
-  const map: Record<string, string> = {
-    CARD: "bg-violet-500/15 text-violet-400 border-violet-500/30",
-    CASH: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-    BANK_TRANSFER: "bg-sky-500/15 text-sky-400 border-sky-500/30",
-  }
-  const label: Record<string, string> = {
-    CARD: "Card",
-    CASH: "Cash",
-    BANK_TRANSFER: "Bank Transfer",
-  }
+function MethodBadge({ method }: { method: PaymentMethod }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${map[method] ?? "bg-muted text-muted-foreground border-border"}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${PAYMENT_METHOD_STYLES[method]}`}
     >
-      {label[method] ?? method}
+      {PAYMENT_METHOD_LABELS[method]}
     </span>
   )
 }
 
-function invoiceStatusBadge(status: string) {
-  const map: Record<string, string> = {
-    PAID: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    OVERDUE: "bg-red-500/15 text-red-400 border-red-500/30",
-    SENT: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-    DRAFT: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
-  }
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${map[status] ?? "bg-muted text-muted-foreground border-border"}`}
-    >
-      {status}
-    </span>
-  )
+function fmtAUD(amount: number) {
+  return amount.toLocaleString("en-AU", { style: "currency", currency: "AUD" })
 }
 
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-AU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
+function fmtDate(d: Date) {
+  return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })
 }
-
-function fmtCurrency(n: number) {
-  return `$${n.toFixed(2)}`
-}
-
-const today = "2026-07-28"
 
 const emptyForm = {
-  customer: "",
+  bookingId: "",
   amount: "",
-  method: "CARD",
+  type: "RENTAL_FEE" as PaymentType,
+  method: "CARD" as PaymentMethod,
   reference: "",
   notes: "",
 }
 
 interface PaymentsViewProps {
-  payments: Payment[]
-  invoices: Invoice[]
-  outstanding: Outstanding[]
-  totalCollected: number
-  outstandingBalance: number
-  overdueCount: number
+  payments: PaymentRow[]
+  bookings: BookingOption[]
 }
 
-export function PaymentsView({
-  payments,
-  invoices,
-  outstanding,
-  totalCollected,
-  outstandingBalance,
-  overdueCount,
-}: PaymentsViewProps) {
+export function PaymentsView({ payments, bookings }: PaymentsViewProps) {
   const [search, setSearch] = useState("")
   const [methodFilter, setMethodFilter] = useState("all")
+  const [typeFilter, setTypeFilter] = useState("all")
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [isPending, startTransition] = useTransition()
 
-  const filteredPayments = payments.filter((p) => {
+  const totalRevenue = payments.reduce((s, p) => s + p.amount, 0)
+  const cashCount = payments.filter((p) => p.method === "CASH").length
+  const cardCount = payments.filter((p) => p.method === "CARD").length
+  const transferCount = payments.filter((p) => p.method === "BANK_TRANSFER").length
+
+  const filtered = payments.filter((p) => {
+    const customerName =
+      `${p.booking.customer.firstName} ${p.booking.customer.lastName}`.toLowerCase()
     const matchSearch =
       search.trim() === "" ||
-      p.customer.toLowerCase().includes(search.toLowerCase()) ||
-      p.bookingId.toLowerCase().includes(search.toLowerCase()) ||
+      customerName.includes(search.toLowerCase()) ||
+      p.booking.bookingNumber.toLowerCase().includes(search.toLowerCase()) ||
       p.id.toLowerCase().includes(search.toLowerCase())
     const matchMethod = methodFilter === "all" || p.method === methodFilter
-    return matchSearch && matchMethod
+    const matchType = typeFilter === "all" || p.type === typeFilter
+    return matchSearch && matchMethod && matchType
   })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    toast.success("Payment recorded successfully")
-    setOpen(false)
-    setForm(emptyForm)
+    startTransition(async () => {
+      try {
+        await createPayment({
+          bookingId: form.bookingId,
+          amount: parseFloat(form.amount),
+          type: form.type,
+          method: form.method,
+          reference: form.reference || undefined,
+          notes: form.notes || undefined,
+        })
+        toast.success("Payment recorded successfully")
+        setOpen(false)
+        setForm(emptyForm)
+      } catch {
+        toast.error("Failed to record payment")
+      }
+    })
   }
 
   return (
@@ -195,7 +175,7 @@ export function PaymentsView({
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage payments and invoicing</p>
+          <p className="text-sm text-muted-foreground mt-1">Manage payments and transactions</p>
         </div>
         <Button onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" />
@@ -203,55 +183,66 @@ export function PaymentsView({
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* Stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Collected This Month
+              Total Revenue
             </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{fmtCurrency(totalCollected)}</p>
+            <p className="text-2xl font-bold">{fmtAUD(totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Outstanding Balance
-            </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Card</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-yellow-400">{fmtCurrency(outstandingBalance)}</p>
+            <p className="text-2xl font-bold">{cardCount}</p>
+            <p className="text-xs text-muted-foreground">payments</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Cash</CardTitle>
+            <Banknote className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{cashCount}</p>
+            <p className="text-xs text-muted-foreground">payments</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Overdue Invoices
+              Bank Transfer
             </CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-400">{overdueCount}</p>
+            <p className="text-2xl font-bold">{transferCount}</p>
+            <p className="text-xs text-muted-foreground">payments</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="payments">
         <TabsList>
-          <TabsTrigger value="payments">All Payments</TabsTrigger>
-          <TabsTrigger value="invoices">Invoices</TabsTrigger>
-          <TabsTrigger value="outstanding">Outstanding</TabsTrigger>
+          <TabsTrigger value="payments">
+            All Payments
+            <Badge variant="secondary" className="ml-1">{payments.length}</Badge>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="payments" className="mt-4 space-y-4">
-          {/* Filter bar for payments tab */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1 max-w-sm">
               <Input
-                placeholder="Search customer, booking ID..."
+                placeholder="Search customer, booking #..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -265,9 +256,26 @@ export function PaymentsView({
                 <SelectItem value="CARD">Card</SelectItem>
                 <SelectItem value="CASH">Cash</SelectItem>
                 <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                <SelectItem value="ONLINE">Online</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? "all")}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="DEPOSIT">Deposit</SelectItem>
+                <SelectItem value="RENTAL_FEE">Rental Fee</SelectItem>
+                <SelectItem value="EXTRA_CHARGE">Extra Charge</SelectItem>
+                <SelectItem value="DAMAGE_CHARGE">Damage Charge</SelectItem>
+                <SelectItem value="FUEL_CHARGE">Fuel Charge</SelectItem>
+                <SelectItem value="LATE_RETURN">Late Return</SelectItem>
+                <SelectItem value="REFUND">Refund</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -283,28 +291,38 @@ export function PaymentsView({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPayments.length === 0 ? (
+                  {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                         No payments found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredPayments.map((p) => (
+                    filtered.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell className="font-mono text-xs text-muted-foreground">
-                          {p.bookingId}
+                          {p.booking.bookingNumber}
                         </TableCell>
-                        <TableCell className="font-medium">{p.customer}</TableCell>
-                        <TableCell className="text-right font-mono">{fmtCurrency(p.amount)}</TableCell>
-                        <TableCell>{paymentTypeBadge(p.type)}</TableCell>
-                        <TableCell>{methodBadge(p.method)}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{fmtDate(p.date)}</TableCell>
+                        <TableCell className="font-medium">
+                          {p.booking.customer.firstName} {p.booking.customer.lastName}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {fmtAUD(p.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <TypeBadge type={p.type} />
+                        </TableCell>
+                        <TableCell>
+                          <MethodBadge method={p.method} />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {fmtDate(p.createdAt)}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => toast.info(`Viewing receipt for ${p.id}`)}
+                            onClick={() => toast.info(`Viewing receipt for payment ${p.id}`)}
                           >
                             <Receipt className="h-4 w-4 mr-1" />
                             View Receipt
@@ -313,130 +331,6 @@ export function PaymentsView({
                       </TableRow>
                     ))
                   )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="invoices" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Booking #</TableHead>
-                    <TableHead className="text-right">Subtotal</TableHead>
-                    <TableHead className="text-right">GST</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => {
-                    const isOverdue = inv.dueDate < today && inv.status !== "PAID"
-                    return (
-                      <TableRow key={inv.id}>
-                        <TableCell className="font-mono text-xs">{inv.id}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {inv.bookingId}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {fmtCurrency(inv.subtotal)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {fmtCurrency(inv.gst)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {fmtCurrency(inv.total)}
-                        </TableCell>
-                        <TableCell>{invoiceStatusBadge(inv.status)}</TableCell>
-                        <TableCell
-                          className={`text-sm ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"}`}
-                        >
-                          {fmtDate(inv.dueDate)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toast.info(`Sending invoice ${inv.id}`)}
-                            >
-                              <Send className="h-4 w-4 mr-1" />
-                              Send
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toast.info(`Downloading invoice ${inv.id}`)}
-                            >
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="outstanding" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Booking #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Vehicle</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {outstanding
-                    .slice()
-                    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-                    .map((o) => {
-                      const isOverdue = o.dueDate < today
-                      return (
-                        <TableRow key={o.bookingId}>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {o.bookingId}
-                          </TableCell>
-                          <TableCell className="font-medium">{o.customer}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{o.vehicle}</TableCell>
-                          <TableCell className="text-right font-mono font-medium text-red-400">
-                            {fmtCurrency(o.balance)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-sm ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"}`}
-                          >
-                            {isOverdue && <AlertCircle className="h-3 w-3 inline mr-1" />}
-                            {fmtDate(o.dueDate)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toast.info(`Viewing outstanding for ${o.bookingId}`)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -452,13 +346,20 @@ export function PaymentsView({
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
-              <Label>Customer</Label>
-              <Input
-                value={form.customer}
-                onChange={(e) => setForm((f) => ({ ...f, customer: e.target.value }))}
-                placeholder="James Hartley"
+              <Label>Booking</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.bookingId}
+                onChange={(e) => setForm((f) => ({ ...f, bookingId: e.target.value }))}
                 required
-              />
+              >
+                <option value="">Select booking...</option>
+                {bookings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.bookingNumber} - {b.customer.firstName} {b.customer.lastName}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label>Amount (AUD)</Label>
@@ -473,10 +374,34 @@ export function PaymentsView({
               />
             </div>
             <div className="space-y-1.5">
+              <Label>Payment Type</Label>
+              <Select
+                value={form.type}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, type: (v ?? "RENTAL_FEE") as PaymentType }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DEPOSIT">Deposit</SelectItem>
+                  <SelectItem value="RENTAL_FEE">Rental Fee</SelectItem>
+                  <SelectItem value="EXTRA_CHARGE">Extra Charge</SelectItem>
+                  <SelectItem value="DAMAGE_CHARGE">Damage Charge</SelectItem>
+                  <SelectItem value="FUEL_CHARGE">Fuel Charge</SelectItem>
+                  <SelectItem value="LATE_RETURN">Late Return</SelectItem>
+                  <SelectItem value="REFUND">Refund</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label>Payment Method</Label>
               <Select
                 value={form.method}
-                onValueChange={(v) => setForm((f) => ({ ...f, method: v ?? "CARD" }))}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, method: (v ?? "CARD") as PaymentMethod }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select method" />
@@ -485,6 +410,7 @@ export function PaymentsView({
                   <SelectItem value="CARD">Card</SelectItem>
                   <SelectItem value="CASH">Cash</SelectItem>
                   <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                  <SelectItem value="ONLINE">Online</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -493,7 +419,7 @@ export function PaymentsView({
               <Input
                 value={form.reference}
                 onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
-                placeholder="BK-1042"
+                placeholder="Optional reference..."
               />
             </div>
             <div className="space-y-1.5">
@@ -509,7 +435,9 @@ export function PaymentsView({
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Record Payment</Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Recording..." : "Record Payment"}
+              </Button>
             </SheetFooter>
           </form>
         </SheetContent>

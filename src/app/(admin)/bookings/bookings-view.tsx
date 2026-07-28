@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
   Search,
   Plus,
   MoreHorizontal,
   Eye,
   PenLine,
-  FileText,
   X,
   Clock,
   CheckCircle2,
@@ -15,6 +14,7 @@ import {
   RotateCcw,
 } from "lucide-react"
 import { toast } from "sonner"
+import type { Booking, Customer, Vehicle, BookingStatus, BookingSource } from "@/generated/prisma"
 
 import {
   Card,
@@ -69,58 +69,65 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-type BookingStatus = "Pending" | "Confirmed" | "Active" | "Completed" | "Cancelled"
-type BookingSource = "WALK_IN" | "PHONE" | "WEB"
+import { createBooking, updateBookingStatus } from "./actions"
 
-interface Booking {
-  id: string
-  customer: string
-  vehicle: string
-  pickupDate: string
-  returnDate: string
-  status: BookingStatus
-  source: BookingSource
+type BookingRow = Booking & { customer: Customer; vehicle: Vehicle }
+type CustomerOption = Pick<Customer, "id" | "firstName" | "lastName">
+type VehicleOption = Pick<Vehicle, "id" | "make" | "model" | "registrationNo">
+
+const STATUS_LABELS: Record<BookingStatus, string> = {
+  PENDING: "Pending",
+  CONFIRMED: "Confirmed",
+  ACTIVE: "Active",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  NO_SHOW: "No Show",
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-AU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
+const SOURCE_LABELS: Record<BookingSource, string> = {
+  WALK_IN: "Walk-in",
+  PHONE: "Phone",
+  WEB: "Web",
+  THIRD_PARTY: "Third Party",
 }
 
-function getDurationDays(pickup: string, returnDate: string): number {
-  const a = new Date(pickup)
-  const b = new Date(returnDate)
-  return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24))
+function fmtDate(d: Date) {
+  return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function getDurationDays(pickup: Date, returnDate: Date): number {
+  return Math.round((returnDate.getTime() - pickup.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function StatusBadge({ status }: { status: BookingStatus }) {
   const styles: Record<BookingStatus, string> = {
-    Pending: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-0",
-    Confirmed: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-0",
-    Active: "bg-green-500/15 text-green-600 dark:text-green-400 border-0",
-    Completed: "bg-muted text-muted-foreground border-0",
-    Cancelled: "bg-destructive/10 text-destructive border-0",
+    PENDING: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-0",
+    CONFIRMED: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-0",
+    ACTIVE: "bg-green-500/15 text-green-600 dark:text-green-400 border-0",
+    COMPLETED: "bg-muted text-muted-foreground border-0",
+    CANCELLED: "bg-destructive/10 text-destructive border-0",
+    NO_SHOW: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-0",
   }
-  return <Badge className={styles[status]}>{status}</Badge>
+  return <Badge className={styles[status]}>{STATUS_LABELS[status]}</Badge>
 }
 
 function SourceBadge({ source }: { source: BookingSource }) {
-  const labels: Record<BookingSource, string> = {
-    WALK_IN: "Walk-in",
-    PHONE: "Phone",
-    WEB: "Web",
-  }
   return (
     <Badge variant="outline" className="font-mono text-[10px] tracking-wide">
-      {labels[source]}
+      {SOURCE_LABELS[source]}
     </Badge>
   )
 }
 
-function BookingActionsMenu({ booking }: { booking: Booking }) {
+function BookingActionsMenu({
+  booking,
+  onConfirm,
+  onCancel,
+}: {
+  booking: BookingRow
+  onConfirm: () => void
+  onCancel: () => void
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -132,18 +139,20 @@ function BookingActionsMenu({ booking }: { booking: Booking }) {
         }
       />
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => toast.info(`Viewing booking ${booking.id}`)}>
+        <DropdownMenuItem onSelect={() => toast.info(`Viewing booking ${booking.bookingNumber}`)}>
           <Eye className="h-4 w-4" />
           View
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => toast.info(`Editing booking ${booking.id}`)}>
+        <DropdownMenuItem onSelect={() => toast.info(`Editing booking ${booking.bookingNumber}`)}>
           <PenLine className="h-4 w-4" />
           Edit
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => toast.info(`Generating contract for ${booking.id}`)}>
-          <FileText className="h-4 w-4" />
-          Generate Contract
-        </DropdownMenuItem>
+        {booking.status === "PENDING" && (
+          <DropdownMenuItem onSelect={onConfirm}>
+            <CheckCircle2 className="h-4 w-4" />
+            Confirm
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <AlertDialog>
           <AlertDialogTrigger
@@ -158,15 +167,14 @@ function BookingActionsMenu({ booking }: { booking: Booking }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
               <AlertDialogDescription>
-                Booking {booking.id} for {booking.customer} will be cancelled. This action cannot be undone.
+                Booking {booking.bookingNumber} for{" "}
+                {booking.customer.firstName} {booking.customer.lastName} will be cancelled. This
+                action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => toast.success(`Booking ${booking.id} cancelled`)}
-              >
+              <AlertDialogAction variant="destructive" onClick={onCancel}>
                 Yes, Cancel
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -177,7 +185,15 @@ function BookingActionsMenu({ booking }: { booking: Booking }) {
   )
 }
 
-function BookingsTable({ rows }: { rows: Booking[] }) {
+function BookingsTable({
+  rows,
+  onConfirm,
+  onCancel,
+}: {
+  rows: BookingRow[]
+  onConfirm: (id: string) => void
+  onCancel: (id: string) => void
+}) {
   return (
     <Table>
       <TableHeader>
@@ -204,19 +220,31 @@ function BookingsTable({ rows }: { rows: Booking[] }) {
           rows.map((booking) => (
             <TableRow key={booking.id}>
               <TableCell className="pl-4">
-                <span className="font-mono text-xs text-foreground">{booking.id}</span>
+                <span className="font-mono text-xs text-foreground">{booking.bookingNumber}</span>
               </TableCell>
-              <TableCell className="font-medium text-foreground">{booking.customer}</TableCell>
-              <TableCell className="text-muted-foreground max-w-[200px] truncate">{booking.vehicle}</TableCell>
-              <TableCell className="text-muted-foreground">{formatDate(booking.pickupDate)}</TableCell>
-              <TableCell className="text-muted-foreground">{formatDate(booking.returnDate)}</TableCell>
+              <TableCell className="font-medium text-foreground">
+                {booking.customer.firstName} {booking.customer.lastName}
+              </TableCell>
+              <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                {booking.vehicle.make} {booking.vehicle.model} ({booking.vehicle.registrationNo})
+              </TableCell>
+              <TableCell className="text-muted-foreground">{fmtDate(booking.pickupDate)}</TableCell>
+              <TableCell className="text-muted-foreground">{fmtDate(booking.returnDate)}</TableCell>
               <TableCell className="text-muted-foreground">
                 {getDurationDays(booking.pickupDate, booking.returnDate)}d
               </TableCell>
-              <TableCell><StatusBadge status={booking.status} /></TableCell>
-              <TableCell><SourceBadge source={booking.source} /></TableCell>
+              <TableCell>
+                <StatusBadge status={booking.status} />
+              </TableCell>
+              <TableCell>
+                <SourceBadge source={booking.source} />
+              </TableCell>
               <TableCell className="pr-4 text-right">
-                <BookingActionsMenu booking={booking} />
+                <BookingActionsMenu
+                  booking={booking}
+                  onConfirm={() => onConfirm(booking.id)}
+                  onCancel={() => onCancel(booking.id)}
+                />
               </TableCell>
             </TableRow>
           ))
@@ -226,60 +254,103 @@ function BookingsTable({ rows }: { rows: Booking[] }) {
   )
 }
 
-const tabFilters: Record<string, (b: Booking) => boolean> = {
+const tabFilters: Record<string, (b: BookingRow) => boolean> = {
   all: () => true,
-  active: (b) => b.status === "Active",
-  upcoming: (b) => b.status === "Pending" || b.status === "Confirmed",
-  completed: (b) => b.status === "Completed",
-  cancelled: (b) => b.status === "Cancelled",
+  active: (b) => b.status === "ACTIVE",
+  upcoming: (b) => b.status === "PENDING" || b.status === "CONFIRMED",
+  completed: (b) => b.status === "COMPLETED",
+  cancelled: (b) => b.status === "CANCELLED",
 }
 
 const emptyForm = {
-  customerName: "",
-  vehicle: "",
+  customerId: "",
+  vehicleId: "",
   pickupDate: "",
   returnDate: "",
+  pickupLocation: "",
   source: "WALK_IN" as BookingSource,
   notes: "",
 }
 
 interface BookingsViewProps {
-  bookings: Booking[]
-  pendingCount: number
-  confirmedCount: number
-  activeCount: number
-  todaysReturns: number
+  bookings: BookingRow[]
+  customers: CustomerOption[]
+  vehicles: VehicleOption[]
 }
 
-export function BookingsView({
-  bookings,
-  pendingCount,
-  confirmedCount,
-  activeCount,
-  todaysReturns,
-}: BookingsViewProps) {
+export function BookingsView({ bookings, customers, vehicles }: BookingsViewProps) {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all-status")
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [isPending, startTransition] = useTransition()
+
+  const today = new Date().toDateString()
+  const pendingCount = bookings.filter((b) => b.status === "PENDING").length
+  const confirmedCount = bookings.filter((b) => b.status === "CONFIRMED").length
+  const activeCount = bookings.filter((b) => b.status === "ACTIVE").length
+  const todaysReturns = bookings.filter(
+    (b) =>
+      b.returnDate.toDateString() === today &&
+      (b.status === "ACTIVE" || b.status === "CONFIRMED")
+  ).length
 
   const filtered = bookings.filter((b) => {
+    const customerName = `${b.customer.firstName} ${b.customer.lastName}`.toLowerCase()
+    const vehicleLabel =
+      `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.registrationNo}`.toLowerCase()
     const matchSearch =
       search.trim() === "" ||
-      b.id.toLowerCase().includes(search.toLowerCase()) ||
-      b.customer.toLowerCase().includes(search.toLowerCase()) ||
-      b.vehicle.toLowerCase().includes(search.toLowerCase())
+      b.bookingNumber.toLowerCase().includes(search.toLowerCase()) ||
+      customerName.includes(search.toLowerCase()) ||
+      vehicleLabel.includes(search.toLowerCase())
     const matchStatus =
-      statusFilter === "all-status" ||
-      b.status.toLowerCase() === statusFilter.toLowerCase()
+      statusFilter === "all-status" || b.status.toLowerCase() === statusFilter.toLowerCase()
     return matchSearch && matchStatus
   })
 
+  function handleConfirm(id: string) {
+    startTransition(async () => {
+      try {
+        await updateBookingStatus(id, "CONFIRMED")
+        toast.success("Booking confirmed")
+      } catch {
+        toast.error("Failed to confirm booking")
+      }
+    })
+  }
+
+  function handleCancel(id: string) {
+    startTransition(async () => {
+      try {
+        await updateBookingStatus(id, "CANCELLED")
+        toast.success("Booking cancelled")
+      } catch {
+        toast.error("Failed to cancel booking")
+      }
+    })
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    toast.success("Booking created successfully")
-    setOpen(false)
-    setForm(emptyForm)
+    startTransition(async () => {
+      try {
+        await createBooking({
+          customerId: form.customerId,
+          vehicleId: form.vehicleId,
+          pickupDate: form.pickupDate,
+          returnDate: form.returnDate,
+          pickupLocation: form.pickupLocation,
+          source: form.source,
+          notes: form.notes || undefined,
+        })
+        toast.success("Booking created successfully")
+        setOpen(false)
+        setForm(emptyForm)
+      } catch {
+        toast.error("Failed to create booking")
+      }
+    })
   }
 
   return (
@@ -370,9 +441,6 @@ export function BookingsView({
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground hidden sm:block">
-          Date range: Jul 2026 – Aug 2026
-        </span>
       </div>
 
       {/* Tabs + Table */}
@@ -383,7 +451,9 @@ export function BookingsView({
               <TabsList variant="line">
                 <TabsTrigger value="all">
                   All
-                  <Badge variant="secondary" className="ml-1">{filtered.length}</Badge>
+                  <Badge variant="secondary" className="ml-1">
+                    {filtered.length}
+                  </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="active">
                   Active
@@ -403,7 +473,11 @@ export function BookingsView({
             </div>
             {(["all", "active", "upcoming", "completed", "cancelled"] as const).map((tab) => (
               <TabsContent key={tab} value={tab}>
-                <BookingsTable rows={filtered.filter(tabFilters[tab])} />
+                <BookingsTable
+                  rows={filtered.filter(tabFilters[tab])}
+                  onConfirm={handleConfirm}
+                  onCancel={handleCancel}
+                />
               </TabsContent>
             ))}
           </Tabs>
@@ -418,22 +492,36 @@ export function BookingsView({
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
-              <Label>Customer Name</Label>
-              <Input
-                value={form.customerName}
-                onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
-                placeholder="James Hartley"
+              <Label>Customer</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.customerId}
+                onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))}
                 required
-              />
+              >
+                <option value="">Select customer...</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.firstName} {c.lastName}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label>Vehicle</Label>
-              <Input
-                value={form.vehicle}
-                onChange={(e) => setForm((f) => ({ ...f, vehicle: e.target.value }))}
-                placeholder="Toyota HiLux SR5 (GHB-123)"
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.vehicleId}
+                onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))}
                 required
-              />
+              >
+                <option value="">Select vehicle...</option>
+                {vehicles.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.make} {v.model} ({v.registrationNo})
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label>Pickup Date</Label>
@@ -454,10 +542,21 @@ export function BookingsView({
               />
             </div>
             <div className="space-y-1.5">
+              <Label>Pickup Location</Label>
+              <Input
+                value={form.pickupLocation}
+                onChange={(e) => setForm((f) => ({ ...f, pickupLocation: e.target.value }))}
+                placeholder="e.g. Melbourne CBD"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label>Source</Label>
               <Select
                 value={form.source}
-                onValueChange={(v) => setForm((f) => ({ ...f, source: (v ?? "WALK_IN") as BookingSource }))}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, source: (v ?? "WALK_IN") as BookingSource }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select source" />
@@ -466,6 +565,7 @@ export function BookingsView({
                   <SelectItem value="WALK_IN">Walk-in</SelectItem>
                   <SelectItem value="PHONE">Phone</SelectItem>
                   <SelectItem value="WEB">Web</SelectItem>
+                  <SelectItem value="THIRD_PARTY">Third Party</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -482,7 +582,9 @@ export function BookingsView({
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create Booking</Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Creating..." : "Create Booking"}
+              </Button>
             </SheetFooter>
           </form>
         </SheetContent>

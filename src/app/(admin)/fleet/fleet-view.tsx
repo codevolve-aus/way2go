@@ -1,19 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
   MoreHorizontal,
   Pencil,
   History,
-  RefreshCw,
-  Archive,
-  Search,
-  Plus,
   Eye,
   Wrench,
   Trash2,
+  Search,
+  Plus,
+  RefreshCw,
+  Archive,
 } from "lucide-react"
 import { toast } from "sonner"
+import type { Vehicle, VehicleCategory, VehicleStatus } from "@/generated/prisma"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -59,21 +60,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Textarea } from "@/components/ui/textarea"
 
-type VehicleStatus = "AVAILABLE" | "BOOKED" | "MAINTENANCE" | "DAMAGED" | "RETIRED"
+import { createVehicle, updateVehicleStatus, deleteVehicle } from "./actions"
 
-interface Vehicle {
-  id: string
-  make: string
-  model: string
-  year: number
-  plate: string
-  category: string
-  status: VehicleStatus
-  fuel: string
-  transmission: string
-  seats: number
-  odometer: string
+type VehicleRow = Vehicle & { category: VehicleCategory }
+type CategoryOption = Pick<VehicleCategory, "id" | "name">
+
+interface FleetViewProps {
+  vehicles: VehicleRow[]
+  categories: CategoryOption[]
 }
 
 const statusBadgeClass: Record<VehicleStatus, string> = {
@@ -84,44 +80,117 @@ const statusBadgeClass: Record<VehicleStatus, string> = {
   RETIRED: "border-muted-foreground/30 text-muted-foreground",
 }
 
+function fmtDate(d: Date) {
+  return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })
+}
+
 const emptyForm = {
-  makeModel: "",
+  make: "",
+  model: "",
   year: "",
-  registration: "",
-  category: "ECONOMY",
-  color: "",
-  status: "AVAILABLE",
+  colour: "",
+  registrationNo: "",
+  categoryId: "",
+  fuelType: "PETROL" as const,
+  transmission: "AUTOMATIC" as const,
+  seats: "5",
+  vin: "",
+  notes: "",
 }
 
-interface FleetViewProps {
-  vehicles: Vehicle[]
-}
-
-export function FleetView({ vehicles }: FleetViewProps) {
+export function FleetView({ vehicles, categories }: FleetViewProps) {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [categoryFilter, setCategoryFilter] = useState("ALL")
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
-
-  const categories = Array.from(new Set(vehicles.map((v) => v.category))).sort()
+  const [isPending, startTransition] = useTransition()
 
   const filtered = vehicles.filter((v) => {
     const matchSearch =
       search.trim() === "" ||
-      `${v.make} ${v.model} ${v.year} ${v.plate}`
+      `${v.make} ${v.model} ${v.registrationNo} ${v.category.name}`
         .toLowerCase()
         .includes(search.toLowerCase())
     const matchStatus = statusFilter === "ALL" || v.status === statusFilter
-    const matchCategory = categoryFilter === "ALL" || v.category === categoryFilter
+    const matchCategory = categoryFilter === "ALL" || v.category.name === categoryFilter
     return matchSearch && matchStatus && matchCategory
   })
 
+  const categoryNames = Array.from(new Set(vehicles.map((v) => v.category.name))).sort()
+
+  function resetForm() {
+    setForm(emptyForm)
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    toast.success("Vehicle added successfully")
-    setOpen(false)
-    setForm(emptyForm)
+    startTransition(async () => {
+      try {
+        await createVehicle({
+          make: form.make,
+          model: form.model,
+          year: parseInt(form.year, 10),
+          colour: form.colour,
+          registrationNo: form.registrationNo,
+          categoryId: form.categoryId,
+          fuelType: form.fuelType,
+          transmission: form.transmission,
+          seats: parseInt(form.seats, 10),
+          vin: form.vin || undefined,
+          notes: form.notes || undefined,
+        })
+        toast.success("Vehicle added successfully")
+        setOpen(false)
+        resetForm()
+      } catch {
+        toast.error("Failed to add vehicle")
+      }
+    })
+  }
+
+  function handleSetAvailable(id: string, label: string) {
+    startTransition(async () => {
+      try {
+        await updateVehicleStatus(id, "AVAILABLE")
+        toast.success(`${label} set to Available`)
+      } catch {
+        toast.error("Failed to update status")
+      }
+    })
+  }
+
+  function handleSetMaintenance(id: string, label: string) {
+    startTransition(async () => {
+      try {
+        await updateVehicleStatus(id, "MAINTENANCE")
+        toast.success(`${label} marked for maintenance`)
+      } catch {
+        toast.error("Failed to update status")
+      }
+    })
+  }
+
+  function handleRetire(id: string, label: string) {
+    startTransition(async () => {
+      try {
+        await updateVehicleStatus(id, "RETIRED")
+        toast.success(`${label} retired`)
+      } catch {
+        toast.error("Failed to update status")
+      }
+    })
+  }
+
+  function handleDelete(id: string, label: string) {
+    startTransition(async () => {
+      try {
+        await deleteVehicle(id)
+        toast.success(`${label} deleted`)
+      } catch {
+        toast.error("Failed to delete vehicle")
+      }
+    })
   }
 
   return (
@@ -170,7 +239,7 @@ export function FleetView({ vehicles }: FleetViewProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Categories</SelectItem>
-            {categories.map((cat) => (
+            {categoryNames.map((cat) => (
               <SelectItem key={cat} value={cat}>
                 {cat}
               </SelectItem>
@@ -190,157 +259,189 @@ export function FleetView({ vehicles }: FleetViewProps) {
               <TableHead>Fuel / Trans</TableHead>
               <TableHead>Seats</TableHead>
               <TableHead>Odometer</TableHead>
+              <TableHead>Added</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                   No vehicles match your filters.
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((vehicle) => (
-                <TableRow key={vehicle.id}>
-                  <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium text-foreground">
-                        {vehicle.make} {vehicle.model}{" "}
-                        <span className="text-muted-foreground font-normal">{vehicle.year}</span>
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="w-fit font-mono text-[10px] text-muted-foreground border-border"
-                      >
-                        {vehicle.plate}
+              filtered.map((vehicle) => {
+                const label = `${vehicle.make} ${vehicle.model}`
+                return (
+                  <TableRow key={vehicle.id}>
+                    <TableCell>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium text-foreground">
+                          {vehicle.make} {vehicle.model}{" "}
+                          <span className="text-muted-foreground font-normal">{vehicle.year}</span>
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="w-fit font-mono text-[10px] text-muted-foreground border-border"
+                        >
+                          {vehicle.registrationNo}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{vehicle.category.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={statusBadgeClass[vehicle.status]}>
+                        {vehicle.status}
                       </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{vehicle.category}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={statusBadgeClass[vehicle.status]}>
-                      {vehicle.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {vehicle.fuel} / {vehicle.transmission}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{vehicle.seats}</TableCell>
-                  <TableCell className="text-muted-foreground">{vehicle.odometer}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            toast.info(`Viewing ${vehicle.make} ${vehicle.model} (${vehicle.plate})`)
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {vehicle.fuelType} / {vehicle.transmission}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{vehicle.seats}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {vehicle.odometer.toLocaleString()} km
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {fmtDate(vehicle.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
                           }
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            toast.info(`Editing ${vehicle.make} ${vehicle.model} (${vehicle.plate})`)
-                          }
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            toast.info(`Viewing history for ${vehicle.plate}`)
-                          }
-                        >
-                          <History className="h-4 w-4" />
-                          View History
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <AlertDialog>
-                          <AlertDialogTrigger
-                            render={
-                              <DropdownMenuItem
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                <Wrench className="h-4 w-4" />
-                                Mark Maintenance
-                              </DropdownMenuItem>
+                        />
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              toast.info(`Viewing ${label} (${vehicle.registrationNo})`)
                             }
-                          />
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Mark {vehicle.make} {vehicle.model} for maintenance?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This vehicle ({vehicle.plate}) will be marked as under maintenance and
-                                unavailable for new bookings.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  toast.success(
-                                    `${vehicle.make} ${vehicle.model} marked for maintenance`
-                                  )
-                                }
-                              >
-                                Confirm
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                        <AlertDialog>
-                          <AlertDialogTrigger
-                            render={
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              toast.info(`Editing ${label} (${vehicle.registrationNo})`)
                             }
-                          />
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Delete {vehicle.make} {vehicle.model}?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently remove {vehicle.plate} from your fleet. This action
-                                cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                variant="destructive"
-                                onClick={() =>
-                                  toast.success(
-                                    `${vehicle.make} ${vehicle.model} (${vehicle.plate}) deleted`
-                                  )
-                                }
-                              >
-                                Yes, Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              toast.info(`Viewing history for ${vehicle.registrationNo}`)
+                            }
+                          >
+                            <History className="h-4 w-4" />
+                            View History
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={() => handleSetAvailable(vehicle.id, label)}
+                            disabled={isPending}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Set Available
+                          </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger
+                              render={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <Wrench className="h-4 w-4" />
+                                  Set Maintenance
+                                </DropdownMenuItem>
+                              }
+                            />
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Mark {label} for maintenance?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This vehicle ({vehicle.registrationNo}) will be marked as under
+                                  maintenance and unavailable for new bookings.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleSetMaintenance(vehicle.id, label)}
+                                >
+                                  Confirm
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <AlertDialog>
+                            <AlertDialogTrigger
+                              render={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <Archive className="h-4 w-4" />
+                                  Retire
+                                </DropdownMenuItem>
+                              }
+                            />
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Retire {label}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This vehicle ({vehicle.registrationNo}) will be retired and
+                                  removed from active service.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  variant="destructive"
+                                  onClick={() => handleRetire(vehicle.id, label)}
+                                >
+                                  Yes, Retire
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <AlertDialog>
+                            <AlertDialogTrigger
+                              render={
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              }
+                            />
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete {label}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently remove {vehicle.registrationNo} from your
+                                  fleet. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  variant="destructive"
+                                  onClick={() => handleDelete(vehicle.id, label)}
+                                >
+                                  Yes, Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -358,11 +459,20 @@ export function FleetView({ vehicles }: FleetViewProps) {
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
-              <Label>Make / Model</Label>
+              <Label>Make</Label>
               <Input
-                value={form.makeModel}
-                onChange={(e) => setForm((f) => ({ ...f, makeModel: e.target.value }))}
-                placeholder="Toyota RAV4"
+                value={form.make}
+                onChange={(e) => setForm((f) => ({ ...f, make: e.target.value }))}
+                placeholder="Toyota"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Model</Label>
+              <Input
+                value={form.model}
+                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                placeholder="RAV4"
                 required
               />
             </div>
@@ -379,10 +489,19 @@ export function FleetView({ vehicles }: FleetViewProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Registration</Label>
+              <Label>Colour</Label>
               <Input
-                value={form.registration}
-                onChange={(e) => setForm((f) => ({ ...f, registration: e.target.value }))}
+                value={form.colour}
+                onChange={(e) => setForm((f) => ({ ...f, colour: e.target.value }))}
+                placeholder="Silver"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Registration No.</Label>
+              <Input
+                value={form.registrationNo}
+                onChange={(e) => setForm((f) => ({ ...f, registrationNo: e.target.value }))}
                 placeholder="ABC-123"
                 required
               />
@@ -390,51 +509,97 @@ export function FleetView({ vehicles }: FleetViewProps) {
             <div className="space-y-1.5">
               <Label>Category</Label>
               <Select
-                value={form.category}
-                onValueChange={(v) => setForm((f) => ({ ...f, category: v ?? "ECONOMY" }))}
+                value={form.categoryId}
+                onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v ?? "" }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ECONOMY">Economy</SelectItem>
-                  <SelectItem value="COMPACT">Compact</SelectItem>
-                  <SelectItem value="SUV">SUV</SelectItem>
-                  <SelectItem value="LUXURY">Luxury</SelectItem>
-                  <SelectItem value="VAN">Van</SelectItem>
-                  <SelectItem value="TRUCK">Truck</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Color</Label>
+              <Label>Fuel Type</Label>
+              <Select
+                value={form.fuelType}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, fuelType: (v ?? "PETROL") as typeof f.fuelType }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select fuel type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PETROL">Petrol</SelectItem>
+                  <SelectItem value="DIESEL">Diesel</SelectItem>
+                  <SelectItem value="HYBRID">Hybrid</SelectItem>
+                  <SelectItem value="ELECTRIC">Electric</SelectItem>
+                  <SelectItem value="LPG">LPG</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Transmission</Label>
+              <Select
+                value={form.transmission}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    transmission: (v ?? "AUTOMATIC") as typeof f.transmission,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select transmission" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AUTOMATIC">Automatic</SelectItem>
+                  <SelectItem value="MANUAL">Manual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Seats</Label>
               <Input
-                value={form.color}
-                onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
-                placeholder="Silver"
+                type="number"
+                min="1"
+                max="20"
+                value={form.seats}
+                onChange={(e) => setForm((f) => ({ ...f, seats: e.target.value }))}
+                placeholder="5"
+                required
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) => setForm((f) => ({ ...f, status: v ?? "AVAILABLE" }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AVAILABLE">Available</SelectItem>
-                  <SelectItem value="BOOKED">Booked</SelectItem>
-                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>VIN (optional)</Label>
+              <Input
+                value={form.vin}
+                onChange={(e) => setForm((f) => ({ ...f, vin: e.target.value }))}
+                placeholder="1HGBH41JXMN109186"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Any additional notes..."
+                rows={3}
+              />
             </div>
             <SheetFooter className="px-0">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Add Vehicle</Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Adding…" : "Add Vehicle"}
+              </Button>
             </SheetFooter>
           </form>
         </SheetContent>

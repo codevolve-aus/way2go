@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
   Users,
   Building2,
@@ -8,7 +8,6 @@ import {
   Search,
   MoreHorizontal,
   UserRound,
-  CalendarX,
   PenLine,
   BookPlus,
   Ban,
@@ -16,6 +15,7 @@ import {
   Plus,
 } from "lucide-react"
 import { toast } from "sonner"
+import type { Customer } from "@/generated/prisma"
 
 import {
   Card,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -69,67 +70,36 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-type CustomerType = "Individual" | "Corporate"
-type CustomerStatus = "Active" | "Blacklisted"
+import { createCustomer, blacklistCustomer, unblacklistCustomer } from "./actions"
 
-interface Customer {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
-  licenceExpiry: string
-  type: CustomerType
-  totalBookings: number
-  status: CustomerStatus
+interface CustomersViewProps {
+  customers: Customer[]
 }
 
 function getInitials(firstName: string, lastName: string) {
   return `${firstName[0]}${lastName[0]}`.toUpperCase()
 }
 
-function isLicenceExpiringSoon(expiryDate: string): boolean {
-  const today = new Date("2026-07-28")
-  const expiry = new Date(expiryDate)
-  const diffMs = expiry.getTime() - today.getTime()
-  const diffDays = diffMs / (1000 * 60 * 60 * 24)
-  return diffDays <= 30
-}
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-AU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-}
-
 const emptyForm = {
-  fullName: "",
+  firstName: "",
+  lastName: "",
   email: "",
   phone: "",
-  licenceNumber: "",
+  licenceNo: "",
+  licenceState: "",
   address: "",
 }
 
-interface CustomersViewProps {
-  customers: Customer[]
-  totalCustomers: number
-  corporateAccounts: number
-  blacklisted: number
-}
-
-export function CustomersView({
-  customers,
-  totalCustomers,
-  corporateAccounts,
-  blacklisted,
-}: CustomersViewProps) {
+export function CustomersView({ customers }: CustomersViewProps) {
   const [search, setSearch] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all-types")
   const [statusFilter, setStatusFilter] = useState("all-status")
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [blacklistReason, setBlacklistReason] = useState("")
+  const [isPending, startTransition] = useTransition()
+
+  const totalCustomers = customers.length
+  const blacklisted = customers.filter((c) => c.isBlacklisted).length
 
   const filtered = customers.filter((c) => {
     const fullName = `${c.firstName} ${c.lastName}`
@@ -138,20 +108,64 @@ export function CustomersView({
       fullName.toLowerCase().includes(search.toLowerCase()) ||
       c.email.toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search)
-    const matchType =
-      typeFilter === "all-types" ||
-      c.type.toLowerCase() === typeFilter.toLowerCase()
     const matchStatus =
       statusFilter === "all-status" ||
-      c.status.toLowerCase() === statusFilter.toLowerCase()
-    return matchSearch && matchType && matchStatus
+      (statusFilter === "active" && !c.isBlacklisted) ||
+      (statusFilter === "blacklisted" && c.isBlacklisted)
+    return matchSearch && matchStatus
   })
+
+  function resetForm() {
+    setForm(emptyForm)
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    toast.success("Customer created successfully")
-    setOpen(false)
-    setForm(emptyForm)
+    startTransition(async () => {
+      try {
+        await createCustomer({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone,
+          licenceNo: form.licenceNo || undefined,
+          licenceState: form.licenceState || undefined,
+          address: form.address || undefined,
+        })
+        toast.success("Customer created successfully")
+        setOpen(false)
+        resetForm()
+      } catch {
+        toast.error("Failed to create customer")
+      }
+    })
+  }
+
+  function handleBlacklist(id: string, name: string) {
+    if (!blacklistReason.trim()) {
+      toast.error("Please enter a reason for blacklisting")
+      return
+    }
+    startTransition(async () => {
+      try {
+        await blacklistCustomer(id, blacklistReason)
+        toast.success(`${name} has been blacklisted`)
+        setBlacklistReason("")
+      } catch {
+        toast.error("Failed to blacklist customer")
+      }
+    })
+  }
+
+  function handleUnblacklist(id: string, name: string) {
+    startTransition(async () => {
+      try {
+        await unblacklistCustomer(id)
+        toast.success(`${name} has been unblacklisted`)
+      } catch {
+        toast.error("Failed to unblacklist customer")
+      }
+    })
   }
 
   return (
@@ -187,11 +201,13 @@ export function CustomersView({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wide">
               <Building2 className="h-4 w-4" />
-              Corporate Accounts
+              Active
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-3xl font-bold text-foreground">{corporateAccounts}</span>
+            <span className="text-3xl font-bold text-foreground">
+              {totalCustomers - blacklisted}
+            </span>
           </CardContent>
         </Card>
         <Card size="sm">
@@ -218,16 +234,6 @@ export function CustomersView({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? "all-types")}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Customer type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all-types">All Types</SelectItem>
-            <SelectItem value="individual">Individual</SelectItem>
-            <SelectItem value="corporate">Corporate</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all-status")}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Status" />
@@ -248,9 +254,8 @@ export function CustomersView({
               <TableRow>
                 <TableHead className="pl-4">Customer</TableHead>
                 <TableHead>Phone</TableHead>
-                <TableHead>Licence Expiry</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Total Bookings</TableHead>
+                <TableHead>Licence No.</TableHead>
+                <TableHead>Address</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="pr-4 text-right">Actions</TableHead>
               </TableRow>
@@ -258,13 +263,13 @@ export function CustomersView({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                     No customers found.
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((customer) => {
-                  const expiringSoon = isLicenceExpiringSoon(customer.licenceExpiry)
+                  const fullName = `${customer.firstName} ${customer.lastName}`
                   return (
                     <TableRow key={customer.id}>
                       <TableCell className="pl-4">
@@ -275,47 +280,26 @@ export function CustomersView({
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex flex-col">
-                            <span className="font-medium text-foreground">
-                              {customer.firstName} {customer.lastName}
-                            </span>
+                            <span className="font-medium text-foreground">{fullName}</span>
                             <span className="text-xs text-muted-foreground">{customer.email}</span>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{customer.phone}</TableCell>
-                      <TableCell>
-                        {expiringSoon ? (
-                          <div className="flex items-center gap-1.5">
-                            <CalendarX className="h-4 w-4 text-destructive" />
-                            <Badge variant="destructive">{formatDate(customer.licenceExpiry)}</Badge>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            {formatDate(customer.licenceExpiry)}
-                          </span>
-                        )}
+                      <TableCell className="text-muted-foreground text-sm">
+                        {customer.licenceNo ?? "—"}
+                        {customer.licenceState ? ` (${customer.licenceState})` : ""}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {customer.address ?? "—"}
                       </TableCell>
                       <TableCell>
-                        {customer.type === "Corporate" ? (
-                          <Badge variant="secondary">
-                            <Building2 className="h-3 w-3" />
-                            Corporate
-                          </Badge>
+                        {customer.isBlacklisted ? (
+                          <Badge variant="destructive">Blacklisted</Badge>
                         ) : (
-                          <Badge variant="outline">
-                            <UserRound className="h-3 w-3" />
-                            Individual
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-foreground">{customer.totalBookings}</TableCell>
-                      <TableCell>
-                        {customer.status === "Active" ? (
                           <Badge className="bg-green-500/15 text-green-600 dark:text-green-400 border-0">
                             Active
                           </Badge>
-                        ) : (
-                          <Badge variant="destructive">Blacklisted</Badge>
                         )}
                       </TableCell>
                       <TableCell className="pr-4 text-right">
@@ -330,31 +314,25 @@ export function CustomersView({
                           />
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onSelect={() =>
-                                toast.info(`Viewing profile for ${customer.firstName} ${customer.lastName}`)
-                              }
+                              onSelect={() => toast.info(`Viewing profile for ${fullName}`)}
                             >
                               <UserRound className="h-4 w-4" />
                               View Profile
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onSelect={() =>
-                                toast.info(`Creating booking for ${customer.firstName} ${customer.lastName}`)
-                              }
+                              onSelect={() => toast.info(`Creating booking for ${fullName}`)}
                             >
                               <BookPlus className="h-4 w-4" />
                               New Booking
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onSelect={() =>
-                                toast.info(`Editing ${customer.firstName} ${customer.lastName}`)
-                              }
+                              onSelect={() => toast.info(`Editing ${fullName}`)}
                             >
                               <PenLine className="h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {customer.status === "Active" ? (
+                            {!customer.isBlacklisted ? (
                               <AlertDialog>
                                 <AlertDialogTrigger
                                   render={
@@ -371,19 +349,27 @@ export function CustomersView({
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Blacklist this customer?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      {customer.firstName} {customer.lastName} will be blacklisted and unable to
-                                      make new bookings.
+                                      {fullName} will be blacklisted and unable to make new
+                                      bookings. Please provide a reason.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
+                                  <div className="px-6 pb-2">
+                                    <Textarea
+                                      placeholder="Reason for blacklisting..."
+                                      value={blacklistReason}
+                                      onChange={(e) => setBlacklistReason(e.target.value)}
+                                      rows={3}
+                                    />
+                                  </div>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogCancel
+                                      onClick={() => setBlacklistReason("")}
+                                    >
+                                      Cancel
+                                    </AlertDialogCancel>
                                     <AlertDialogAction
                                       variant="destructive"
-                                      onClick={() =>
-                                        toast.success(
-                                          `${customer.firstName} ${customer.lastName} has been blacklisted`
-                                        )
-                                      }
+                                      onClick={() => handleBlacklist(customer.id, fullName)}
                                     >
                                       Yes, Blacklist
                                     </AlertDialogAction>
@@ -392,11 +378,8 @@ export function CustomersView({
                               </AlertDialog>
                             ) : (
                               <DropdownMenuItem
-                                onSelect={() =>
-                                  toast.success(
-                                    `${customer.firstName} ${customer.lastName} has been unblacklisted`
-                                  )
-                                }
+                                onSelect={() => handleUnblacklist(customer.id, fullName)}
+                                disabled={isPending}
                               >
                                 <ShieldCheck className="h-4 w-4" />
                                 Unblacklist
@@ -422,11 +405,20 @@ export function CustomersView({
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
-              <Label>Full Name</Label>
+              <Label>First Name</Label>
               <Input
-                value={form.fullName}
-                onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-                placeholder="James Hartley"
+                value={form.firstName}
+                onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                placeholder="James"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Last Name</Label>
+              <Input
+                value={form.lastName}
+                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                placeholder="Hartley"
                 required
               />
             </div>
@@ -451,16 +443,23 @@ export function CustomersView({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Driver&apos;s Licence Number</Label>
+              <Label>Licence No. (optional)</Label>
               <Input
-                value={form.licenceNumber}
-                onChange={(e) => setForm((f) => ({ ...f, licenceNumber: e.target.value }))}
+                value={form.licenceNo}
+                onChange={(e) => setForm((f) => ({ ...f, licenceNo: e.target.value }))}
                 placeholder="12345678"
-                required
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Address</Label>
+              <Label>Licence State (optional)</Label>
+              <Input
+                value={form.licenceState}
+                onChange={(e) => setForm((f) => ({ ...f, licenceState: e.target.value }))}
+                placeholder="NSW"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Address (optional)</Label>
               <Input
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
@@ -471,7 +470,9 @@ export function CustomersView({
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create Customer</Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Creating…" : "Create Customer"}
+              </Button>
             </SheetFooter>
           </form>
         </SheetContent>

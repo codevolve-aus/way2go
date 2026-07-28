@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
   FileText,
   FilePen,
@@ -14,6 +14,13 @@ import {
   MoreHorizontal,
 } from "lucide-react"
 import { toast } from "sonner"
+import type {
+  Contract,
+  Booking,
+  Customer,
+  Vehicle,
+  ContractStatus,
+} from "@/generated/prisma"
 
 import {
   Card,
@@ -59,82 +66,88 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-type ContractStatus = "DRAFT" | "SIGNED" | "ACTIVE" | "CLOSED" | "DISPUTED"
+import { voidContract } from "./actions"
 
-interface Contract {
-  id: string
-  contractNumber: string
-  customer: string
-  vehicle: string
-  bookingNumber: string
-  status: ContractStatus
-  totalAmount: number
-  depositPaid: number
-  depositRequired: number
-  createdDate: string
+type ContractRow = Contract & {
+  booking: Booking & { customer: Customer; vehicle: Vehicle }
 }
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    minimumFractionDigits: 2,
-  }).format(amount)
+function fmtAUD(amount: number) {
+  return amount.toLocaleString("en-AU", { style: "currency", currency: "AUD" })
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-AU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
+function fmtDate(d: Date) {
+  return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })
 }
 
 function StatusBadge({ status }: { status: ContractStatus }) {
   switch (status) {
     case "DRAFT":
-      return <Badge variant="secondary" className="text-muted-foreground">Draft</Badge>
+      return (
+        <Badge variant="secondary" className="text-muted-foreground">
+          Draft
+        </Badge>
+      )
     case "SIGNED":
-      return <Badge className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-0">Signed</Badge>
+      return (
+        <Badge className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-0">Signed</Badge>
+      )
     case "ACTIVE":
-      return <Badge className="bg-green-500/15 text-green-600 dark:text-green-400 border-0">Active</Badge>
+      return (
+        <Badge className="bg-green-500/15 text-green-600 dark:text-green-400 border-0">
+          Active
+        </Badge>
+      )
     case "CLOSED":
-      return <Badge variant="outline" className="text-muted-foreground">Closed</Badge>
+      return (
+        <Badge variant="outline" className="text-muted-foreground">
+          Closed
+        </Badge>
+      )
     case "DISPUTED":
       return <Badge variant="destructive">Disputed</Badge>
   }
 }
 
 interface ContractsViewProps {
-  contracts: Contract[]
-  draftCount: number
-  activeCount: number
-  closedCount: number
-  disputedCount: number
+  contracts: ContractRow[]
 }
 
-export function ContractsView({
-  contracts,
-  draftCount,
-  activeCount,
-  closedCount,
-  disputedCount,
-}: ContractsViewProps) {
+export function ContractsView({ contracts }: ContractsViewProps) {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [isPending, startTransition] = useTransition()
 
-  const hasDrafts = draftCount > 0
+  const draftCount = contracts.filter((c) => c.status === "DRAFT").length
+  const activeCount = contracts.filter((c) => c.status === "ACTIVE").length
+  const closedCount = contracts.filter((c) => c.status === "CLOSED").length
+  const disputedCount = contracts.filter((c) => c.status === "DISPUTED").length
 
   const filtered = contracts.filter((c) => {
+    const customerName =
+      `${c.booking.customer.firstName} ${c.booking.customer.lastName}`.toLowerCase()
+    const vehicleReg = c.booking.vehicle.registrationNo.toLowerCase()
     const matchSearch =
       search.trim() === "" ||
       c.contractNumber.toLowerCase().includes(search.toLowerCase()) ||
-      c.customer.toLowerCase().includes(search.toLowerCase()) ||
-      c.bookingNumber.toLowerCase().includes(search.toLowerCase())
+      customerName.includes(search.toLowerCase()) ||
+      vehicleReg.includes(search.toLowerCase()) ||
+      c.booking.bookingNumber.toLowerCase().includes(search.toLowerCase())
     const matchStatus =
       statusFilter === "all" || c.status.toLowerCase() === statusFilter.toLowerCase()
     return matchSearch && matchStatus
   })
+
+  function handleVoid(id: string, contractNumber: string) {
+    startTransition(async () => {
+      try {
+        await voidContract(id)
+        toast.success(`Contract ${contractNumber} has been voided`)
+      } catch {
+        toast.error("Failed to void contract")
+      }
+    })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -149,7 +162,9 @@ export function ContractsView({
         <Button
           variant="outline"
           onClick={() =>
-            toast.info("Contracts are generated from bookings. Create a booking first, then generate a contract from its actions menu.")
+            toast.info(
+              "Contracts are generated from bookings. Create a booking first, then generate a contract from its actions menu."
+            )
           }
         >
           <FileText className="h-4 w-4" />
@@ -206,7 +221,7 @@ export function ContractsView({
       </div>
 
       {/* Pending Signatures Alert */}
-      {hasDrafts && (
+      {draftCount > 0 && (
         <Card className="border-yellow-500/40 bg-yellow-500/5">
           <CardContent className="flex items-start gap-3 py-4">
             <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
@@ -273,9 +288,10 @@ export function ContractsView({
                 </TableRow>
               ) : (
                 filtered.map((contract) => {
-                  const depositPercent = Math.round(
-                    (contract.depositPaid / contract.depositRequired) * 100
-                  )
+                  const depositPercent =
+                    contract.depositAmount > 0
+                      ? Math.round((contract.depositPaid / contract.depositAmount) * 100)
+                      : 0
                   return (
                     <TableRow key={contract.id}>
                       <TableCell className="pl-4">
@@ -284,28 +300,29 @@ export function ContractsView({
                         </span>
                       </TableCell>
                       <TableCell className="font-medium text-foreground">
-                        {contract.customer}
+                        {contract.booking.customer.firstName}{" "}
+                        {contract.booking.customer.lastName}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">
-                        {contract.vehicle}
+                        {contract.booking.vehicle.make} {contract.booking.vehicle.model} (
+                        {contract.booking.vehicle.registrationNo})
                       </TableCell>
                       <TableCell>
                         <span className="font-mono text-xs text-muted-foreground">
-                          {contract.bookingNumber}
+                          {contract.booking.bookingNumber}
                         </span>
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={contract.status} />
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
-                        {formatCurrency(contract.totalAmount)}
+                        {fmtAUD(contract.totalAmount)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>
-                              {formatCurrency(contract.depositPaid)} /{" "}
-                              {formatCurrency(contract.depositRequired)}
+                              {fmtAUD(contract.depositPaid)} / {fmtAUD(contract.depositAmount)}
                             </span>
                             <span>{depositPercent}%</span>
                           </div>
@@ -313,7 +330,7 @@ export function ContractsView({
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {formatDate(contract.createdDate)}
+                        {fmtDate(contract.createdAt)}
                       </TableCell>
                       <TableCell className="pr-4 text-right">
                         <DropdownMenu>
@@ -327,13 +344,17 @@ export function ContractsView({
                           />
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onSelect={() => toast.info(`Viewing contract ${contract.contractNumber}`)}
+                              onSelect={() =>
+                                toast.info(`Viewing contract ${contract.contractNumber}`)
+                              }
                             >
                               <Eye className="h-4 w-4" />
                               View
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onSelect={() => toast.info(`Downloading PDF for ${contract.contractNumber}`)}
+                              onSelect={() =>
+                                toast.info("PDF generation coming soon")
+                              }
                             >
                               <Download className="h-4 w-4" />
                               Download PDF
@@ -357,18 +378,17 @@ export function ContractsView({
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Void this contract?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Contract {contract.contractNumber} will be voided. This action cannot
-                                        be undone.
+                                        Contract {contract.contractNumber} will be voided. This
+                                        action cannot be undone.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Keep Contract</AlertDialogCancel>
                                       <AlertDialogAction
                                         variant="destructive"
+                                        disabled={isPending}
                                         onClick={() =>
-                                          toast.success(
-                                            `Contract ${contract.contractNumber} has been voided`
-                                          )
+                                          handleVoid(contract.id, contract.contractNumber)
                                         }
                                       >
                                         Yes, Void
