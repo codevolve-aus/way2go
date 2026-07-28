@@ -14,7 +14,7 @@ import {
   Archive,
 } from "lucide-react"
 import { toast } from "sonner"
-import type { Vehicle, VehicleCategory, VehicleStatus } from "@/generated/prisma"
+import type { Vehicle, VehicleCategory, VehicleStatus, FuelType, Transmission } from "@/generated/prisma"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -62,7 +62,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 
-import { createVehicle, updateVehicleStatus, deleteVehicle } from "./actions"
+import { createVehicle, updateVehicle, updateVehicleStatus, deleteVehicle } from "./actions"
 
 type VehicleRow = Vehicle & { category: VehicleCategory }
 type CategoryOption = Pick<VehicleCategory, "id" | "name">
@@ -84,15 +84,29 @@ function fmtDate(d: Date) {
   return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })
 }
 
-const emptyForm = {
+type VehicleForm = {
+  make: string
+  model: string
+  year: string
+  colour: string
+  registrationNo: string
+  categoryId: string
+  fuelType: FuelType
+  transmission: Transmission
+  seats: string
+  vin: string
+  notes: string
+}
+
+const emptyForm: VehicleForm = {
   make: "",
   model: "",
   year: "",
   colour: "",
   registrationNo: "",
   categoryId: "",
-  fuelType: "PETROL" as const,
-  transmission: "AUTOMATIC" as const,
+  fuelType: "PETROL",
+  transmission: "AUTOMATIC",
   seats: "5",
   vin: "",
   notes: "",
@@ -103,6 +117,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [categoryFilter, setCategoryFilter] = useState("ALL")
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [isPending, startTransition] = useTransition()
 
@@ -119,8 +134,28 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
 
   const categoryNames = Array.from(new Set(vehicles.map((v) => v.category.name))).sort()
 
-  function resetForm() {
+  function openAdd() {
+    setEditingId(null)
     setForm(emptyForm)
+    setOpen(true)
+  }
+
+  function openEdit(vehicle: VehicleRow) {
+    setEditingId(vehicle.id)
+    setForm({
+      make: vehicle.make,
+      model: vehicle.model,
+      year: String(vehicle.year),
+      colour: vehicle.colour,
+      registrationNo: vehicle.registrationNo,
+      categoryId: vehicle.categoryId,
+      fuelType: vehicle.fuelType,
+      transmission: vehicle.transmission,
+      seats: String(vehicle.seats),
+      vin: vehicle.vin ?? "",
+      notes: vehicle.notes ?? "",
+    })
+    setOpen(true)
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -139,27 +174,32 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
       toast.error("Enter a valid seat count")
       return
     }
+    const payload = {
+      make: form.make,
+      model: form.model,
+      year,
+      colour: form.colour,
+      registrationNo: form.registrationNo,
+      categoryId: form.categoryId,
+      fuelType: form.fuelType,
+      transmission: form.transmission,
+      seats,
+      vin: form.vin || undefined,
+      notes: form.notes || undefined,
+    }
     startTransition(async () => {
       try {
-        await createVehicle({
-          make: form.make,
-          model: form.model,
-          year,
-          colour: form.colour,
-          registrationNo: form.registrationNo,
-          categoryId: form.categoryId,
-          fuelType: form.fuelType,
-          transmission: form.transmission,
-          seats,
-          vin: form.vin || undefined,
-          notes: form.notes || undefined,
-        })
-        toast.success("Vehicle added successfully")
+        if (editingId) {
+          await updateVehicle(editingId, payload)
+          toast.success("Vehicle updated successfully")
+        } else {
+          await createVehicle(payload)
+          toast.success("Vehicle added successfully")
+        }
         setOpen(false)
-        resetForm()
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to add vehicle"
-        toast.error(msg.includes("Unique constraint") ? "Registration number already exists" : "Failed to add vehicle")
+        const msg = err instanceof Error ? err.message : ""
+        toast.error(msg.includes("Unique constraint") ? "Registration number already exists" : editingId ? "Failed to update vehicle" : "Failed to add vehicle")
       }
     })
   }
@@ -218,7 +258,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
             Manage and monitor all vehicles in your fleet.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button onClick={openAdd}>
           <Plus className="h-4 w-4" />
           Add Vehicle
         </Button>
@@ -339,11 +379,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
                             <Eye className="h-4 w-4" />
                             View
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              toast.info(`Editing ${label} (${vehicle.registrationNo})`)
-                            }
-                          >
+                          <DropdownMenuItem onSelect={() => openEdit(vehicle)}>
                             <Pencil className="h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
@@ -470,7 +506,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Add Vehicle</SheetTitle>
+            <SheetTitle>{editingId ? "Edit Vehicle" : "Add Vehicle"}</SheetTitle>
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
@@ -613,7 +649,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Adding…" : "Add Vehicle"}
+                {isPending ? (editingId ? "Saving…" : "Adding…") : (editingId ? "Save Changes" : "Add Vehicle")}
               </Button>
             </SheetFooter>
           </form>

@@ -21,6 +21,26 @@ export async function createVehicle(data: {
   revalidatePath("/fleet")
 }
 
+export async function updateVehicle(
+  id: string,
+  data: {
+    make: string
+    model: string
+    year: number
+    colour: string
+    registrationNo: string
+    categoryId: string
+    fuelType: FuelType
+    transmission: Transmission
+    seats: number
+    vin?: string
+    notes?: string
+  }
+) {
+  await db.vehicle.update({ where: { id }, data })
+  revalidatePath("/fleet")
+}
+
 export async function updateVehicleStatus(id: string, status: VehicleStatus) {
   await db.vehicle.update({ where: { id }, data: { status } })
   revalidatePath("/fleet")
