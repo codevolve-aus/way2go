@@ -20,9 +20,22 @@ import {
   Building2,
   MapPin,
   Users,
+  ShieldCheck,
 } from "lucide-react";
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { UsersTab } from "./users-tab";
 
 export const metadata = { title: "Settings" };
+
+// fetch only when the page renders — not cached, always fresh
+async function getUsers() {
+  try {
+    return await db.userApproval.findMany({ orderBy: { createdAt: "desc" } });
+  } catch {
+    return [];
+  }
+}
 
 const company = {
   name: "Way2Go Car Rentals Pty Ltd",
@@ -164,13 +177,18 @@ function fmtDate(d: string) {
   });
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const session = await auth();
+  const isAdmin = session?.user?.role === "ADMIN";
+  const users = isAdmin ? await getUsers() : [];
+  const pendingCount = users.filter((u) => u.status === "PENDING").length;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage your company, locations, staff and notifications
+          Manage your company, locations, staff, users and notifications
         </p>
       </div>
 
@@ -192,6 +210,17 @@ export default function SettingsPage() {
             <Bell className="h-4 w-4 mr-2" />
             Notifications
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="users" className="relative">
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Users
+              {pendingCount > 0 && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black">
+                  {pendingCount}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Company Tab */}
@@ -381,6 +410,29 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* Users Tab */}
+        {isAdmin && (
+          <TabsContent value="users" className="mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Access Management</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Approve or reject users who have signed in with Google.
+                  </p>
+                </div>
+                {pendingCount > 0 && (
+                  <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-400">
+                    {pendingCount} pending
+                  </span>
+                )}
+              </CardHeader>
+              <CardContent className="p-0">
+                <UsersTab users={users} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
