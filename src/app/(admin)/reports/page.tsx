@@ -1,13 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import {
   Table,
   TableBody,
@@ -15,76 +7,142 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
+} from "@/components/ui/table"
 import {
   DollarSign,
   Car,
   CalendarDays,
   Clock,
-  Download,
-  TrendingUp,
-} from "lucide-react";
+} from "lucide-react"
+import { db } from "@/lib/db"
 
-export const metadata = { title: "Reports" };
+export const metadata = { title: "Reports" }
 
-const kpis = {
-  totalRevenue: 48750.0,
-  fleetUtilisation: 76,
-  totalBookings: 134,
-  avgRentalDuration: 4.2,
-};
-
-const revenueByCategory = [
-  { category: "Sedan", revenue: 18200.0 },
-  { category: "SUV", revenue: 14800.0 },
-  { category: "Ute / Truck", revenue: 9500.0 },
-  { category: "Hatchback", revenue: 4950.0 },
-  { category: "Van", revenue: 1300.0 },
-];
-
-const bookingSources = [
-  { source: "Walk-in", count: 42, pct: 31 },
-  { source: "Phone", count: 38, pct: 28 },
-  { source: "Web", count: 35, pct: 26 },
-  { source: "Third-party", count: 19, pct: 14 },
-];
-
-const topCustomers = [
-  { name: "James Nguyen", bookings: 12, totalSpent: 5840.0 },
-  { name: "Sarah Mitchell", bookings: 9, totalSpent: 4200.0 },
-  { name: "David Chen", bookings: 8, totalSpent: 3850.0 },
-  { name: "Emma Patel", bookings: 7, totalSpent: 3100.0 },
-  { name: "Tom Walsh", bookings: 6, totalSpent: 2750.0 },
-];
-
-const maxRevenue = Math.max(...revenueByCategory.map((r) => r.revenue));
-
-function fmtCurrency(n: number) {
-  return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtAUD(n: number) {
+  return n.toLocaleString("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    minimumFractionDigits: 2,
+  })
 }
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  const [
+    totalPaymentsAgg,
+    bookings,
+    vehicles,
+    bookingsBySource,
+    topCustomersRaw,
+  ] = await Promise.all([
+    // Sum of all recorded payments
+    db.payment.aggregate({ _sum: { amount: true } }),
+
+    // All bookings with vehicle category and duration
+    db.booking.findMany({
+      where: { status: { notIn: ["CANCELLED"] } },
+      include: { vehicle: { include: { category: true } }, payments: true },
+    }),
+
+    // All vehicles for utilisation
+    db.vehicle.findMany({ select: { status: true } }),
+
+    // Booking counts by source
+    db.booking.groupBy({
+      by: ["source"],
+      where: { status: { notIn: ["CANCELLED"] } },
+      _count: { id: true },
+    }),
+
+    // Top customers by booking count + payments
+    db.customer.findMany({
+      where: { bookings: { some: { status: { notIn: ["CANCELLED"] } } } },
+      include: {
+        bookings: {
+          where: { status: { notIn: ["CANCELLED"] } },
+          include: { payments: true },
+        },
+      },
+    }),
+  ])
+
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+
+  const totalRevenue = totalPaymentsAgg._sum.amount ?? 0
+
+  const activeOrBooked = vehicles.filter(
+    (v) => v.status === "BOOKED" || v.status === "MAINTENANCE"
+  ).length
+  const fleetUtilisation =
+    vehicles.length > 0 ? Math.round((activeOrBooked / vehicles.length) * 100) : 0
+
+  const totalBookings = bookings.length
+
+  const durationsWithDays = bookings.map((b) => {
+    const days =
+      Math.round(
+        (b.returnDate.getTime() - b.pickupDate.getTime()) / 86400000
+      ) + 1
+    return days
+  })
+  const avgDuration =
+    durationsWithDays.length > 0
+      ? +(
+          durationsWithDays.reduce((a, b) => a + b, 0) /
+          durationsWithDays.length
+        ).toFixed(1)
+      : 0
+
+  // ── Revenue by Vehicle Category ───────────────────────────────────────────
+
+  const categoryMap: Record<string, number> = {}
+  for (const b of bookings) {
+    const cat = b.vehicle.category.name
+    const paid = b.payments.reduce((s, p) => s + p.amount, 0)
+    categoryMap[cat] = (categoryMap[cat] ?? 0) + paid
+  }
+  const revenueByCategory = Object.entries(categoryMap)
+    .map(([category, revenue]) => ({ category, revenue }))
+    .sort((a, b) => b.revenue - a.revenue)
+  const maxRevenue = revenueByCategory[0]?.revenue ?? 1
+
+  // ── Booking Sources ───────────────────────────────────────────────────────
+
+  const sourceTotal = bookingsBySource.reduce((s, r) => s + r._count.id, 0)
+  const SOURCE_LABEL: Record<string, string> = {
+    WALK_IN: "Walk-in",
+    PHONE: "Phone",
+    WEB: "Web",
+    THIRD_PARTY: "Third Party",
+  }
+  const bookingSourceRows = bookingsBySource
+    .map((r) => ({
+      source: SOURCE_LABEL[r.source] ?? r.source,
+      count: r._count.id,
+      pct: sourceTotal > 0 ? Math.round((r._count.id / sourceTotal) * 100) : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+
+  // ── Top Customers ─────────────────────────────────────────────────────────
+
+  const topCustomers = topCustomersRaw
+    .map((c) => ({
+      name: `${c.firstName} ${c.lastName}`,
+      bookings: c.bookings.length,
+      totalSpent: c.bookings.reduce(
+        (s, b) => s + b.payments.reduce((ps, p) => ps + p.amount, 0),
+        0
+      ),
+    }))
+    .sort((a, b) => b.totalSpent - a.totalSpent || b.bookings - a.bookings)
+    .slice(0, 10)
+
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Analytics and performance overview
-          </p>
-        </div>
-        <Select defaultValue="this-month">
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="this-month">This Month</SelectItem>
-            <SelectItem value="last-month">Last Month</SelectItem>
-            <SelectItem value="this-quarter">This Quarter</SelectItem>
-            <SelectItem value="this-year">This Year</SelectItem>
-          </SelectContent>
-        </Select>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Analytics and performance overview
+        </p>
       </div>
 
       {/* KPI Cards */}
@@ -97,13 +155,8 @@ export default function ReportsPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              {fmtCurrency(kpis.totalRevenue)}
-            </p>
-            <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              +12% vs last month
-            </p>
+            <p className="text-2xl font-bold">{fmtAUD(totalRevenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">All time, from payments</p>
           </CardContent>
         </Card>
         <Card>
@@ -114,11 +167,8 @@ export default function ReportsPage() {
             <Car className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{kpis.fleetUtilisation}%</p>
-            <Progress
-              value={kpis.fleetUtilisation}
-              className="mt-2 h-1.5"
-            />
+            <p className="text-2xl font-bold">{fleetUtilisation}%</p>
+            <Progress value={fleetUtilisation} className="mt-2 h-1.5" />
           </CardContent>
         </Card>
         <Card>
@@ -129,11 +179,8 @@ export default function ReportsPage() {
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{kpis.totalBookings}</p>
-            <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              +8 vs last month
-            </p>
+            <p className="text-2xl font-bold">{totalBookings}</p>
+            <p className="text-xs text-muted-foreground mt-1">Excluding cancelled</p>
           </CardContent>
         </Card>
         <Card>
@@ -144,7 +191,8 @@ export default function ReportsPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{kpis.avgRentalDuration} days</p>
+            <p className="text-2xl font-bold">{avgDuration} days</p>
+            <p className="text-xs text-muted-foreground mt-1">Across all bookings</p>
           </CardContent>
         </Card>
       </div>
@@ -152,105 +200,115 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Revenue by Category */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle className="text-base font-semibold">
               Revenue by Category
             </CardTitle>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" />
-              CSV
-            </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {revenueByCategory.map((r) => {
-              const pct = Math.round((r.revenue / maxRevenue) * 100);
-              return (
-                <div key={r.category} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{r.category}</span>
-                    <span className="font-mono text-muted-foreground">
-                      {fmtCurrency(r.revenue)}
-                    </span>
+          <CardContent>
+            {revenueByCategory.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No payment data recorded yet.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {revenueByCategory.map((r) => (
+                  <div key={r.category} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{r.category}</span>
+                      <span className="font-mono text-muted-foreground">
+                        {fmtAUD(r.revenue)}
+                      </span>
+                    </div>
+                    <Progress
+                      value={Math.round((r.revenue / maxRevenue) * 100)}
+                      className="h-2"
+                    />
                   </div>
-                  <Progress value={pct} className="h-2" />
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Booking Sources */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle className="text-base font-semibold">
               Booking Sources
             </CardTitle>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" />
-              CSV
-            </Button>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {bookingSources.map((s) => (
-                <div
-                  key={s.source}
-                  className="rounded-lg border bg-muted/20 p-4 space-y-1"
-                >
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {s.source}
-                  </p>
-                  <p className="text-2xl font-bold">{s.count}</p>
-                  <p className="text-xs text-muted-foreground">{s.pct}% of total</p>
-                </div>
-              ))}
-            </div>
+            {bookingSourceRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No bookings recorded yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {bookingSourceRows.map((s) => (
+                  <div
+                    key={s.source}
+                    className="rounded-lg border bg-muted/20 p-4 space-y-1"
+                  >
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {s.source}
+                    </p>
+                    <p className="text-2xl font-bold">{s.count}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.pct}% of total
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Top Customers */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle className="text-base font-semibold">
             Top Customers by Revenue
           </CardTitle>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-1" />
-            CSV
-          </Button>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6">Rank</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="text-right">Bookings</TableHead>
-                <TableHead className="text-right pr-6">Total Spent</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {topCustomers.map((c, i) => (
-                <TableRow key={c.name}>
-                  <TableCell className="pl-6">
-                    <span className="text-muted-foreground font-mono text-sm">
-                      #{i + 1}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {c.bookings}
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-medium pr-6">
-                    {fmtCurrency(c.totalSpent)}
-                  </TableCell>
+          {topCustomers.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              No customer data yet.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Rank</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="text-right">Bookings</TableHead>
+                  <TableHead className="text-right pr-6">Total Paid</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {topCustomers.map((c, i) => (
+                  <TableRow key={c.name}>
+                    <TableCell className="pl-6">
+                      <span className="text-muted-foreground font-mono text-sm">
+                        #{i + 1}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {c.bookings}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-medium pr-6">
+                      {fmtAUD(c.totalSpent)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
