@@ -27,6 +27,7 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { SidebarUser } from "@/components/layout/sidebar-user";
 import type { Session } from "next-auth";
@@ -75,23 +76,16 @@ const navMain = [
   },
 ];
 
-export function AppSidebar({ user }: { user?: Session["user"] }) {
+function NavItems() {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  function handleNavClick() {
+    if (isMobile) setOpenMobile(false);
+  }
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold text-sm shrink-0">
-            W2
-          </div>
-          <div className="group-data-[collapsible=icon]:hidden">
-            <p className="text-sm font-semibold text-sidebar-foreground">Way2Go</p>
-            <p className="text-xs text-sidebar-foreground/60">Vehicle Rentals</p>
-          </div>
-        </div>
-      </SidebarHeader>
-
+    <>
       <SidebarContent>
         {navMain.map((group) => (
           <SidebarGroup key={group.label}>
@@ -103,7 +97,7 @@ export function AppSidebar({ user }: { user?: Session["user"] }) {
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      render={<Link href={item.href} />}
+                      render={<Link href={item.href} onClick={handleNavClick} />}
                       isActive={isActive}
                       tooltip={item.title}
                     >
@@ -122,7 +116,7 @@ export function AppSidebar({ user }: { user?: Session["user"] }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              render={<Link href="/settings" />}
+              render={<Link href="/settings" onClick={handleNavClick} />}
               isActive={pathname.startsWith("/settings")}
               tooltip="Settings"
             >
@@ -131,6 +125,29 @@ export function AppSidebar({ user }: { user?: Session["user"] }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+      </SidebarFooter>
+    </>
+  );
+}
+
+export function AppSidebar({ user }: { user?: Session["user"] }) {
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold text-sm shrink-0">
+            W2
+          </div>
+          <div className="group-data-[collapsible=icon]:hidden">
+            <p className="text-sm font-semibold text-sidebar-foreground">Way2Go</p>
+            <p className="text-xs text-sidebar-foreground/60">Vehicle Rentals</p>
+          </div>
+        </div>
+      </SidebarHeader>
+
+      <NavItems />
+
+      <SidebarFooter className="border-t border-sidebar-border pb-2">
         <SidebarUser
           name={user?.name}
           email={user?.email}
