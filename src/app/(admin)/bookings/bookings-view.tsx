@@ -105,7 +105,7 @@ function fmtDate(d: Date) {
 }
 
 function getDurationDays(pickup: Date, returnDate: Date): number {
-  return Math.max(1, Math.round((returnDate.getTime() - pickup.getTime()) / (1000 * 60 * 60 * 24)))
+  return Math.round((returnDate.getTime() - pickup.getTime()) / (1000 * 60 * 60 * 24)) + 1
 }
 
 function StatusBadge({ status }: { status: BookingStatus }) {
