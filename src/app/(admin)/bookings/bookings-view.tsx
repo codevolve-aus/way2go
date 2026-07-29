@@ -13,6 +13,7 @@ import {
   Car,
   RotateCcw,
   CalendarIcon,
+  Mail,
 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -78,7 +79,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-import { createBooking, updateBooking, updateBookingStatus } from "./actions"
+import { createBooking, updateBooking, updateBookingStatus, sendContractEmail } from "./actions"
 
 type BookingRow = Booking & { customer: Customer; vehicle: Vehicle }
 type CustomerOption = Pick<Customer, "id" | "firstName" | "lastName">
@@ -200,11 +201,15 @@ function BookingActionsMenu({
   onEdit,
   onConfirm,
   onCancel,
+  onSendContract,
+  isSending,
 }: {
   booking: BookingRow
   onEdit: () => void
   onConfirm: () => void
   onCancel: () => void
+  onSendContract: () => void
+  isSending: boolean
 }) {
   const [cancelOpen, setCancelOpen] = useState(false)
 
@@ -233,6 +238,15 @@ function BookingActionsMenu({
               <CheckCircle2 className="h-4 w-4" />
               Confirm
             </DropdownMenuItem>
+          )}
+          {booking.status === "CONFIRMED" && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onSendContract} disabled={isSending}>
+                <Mail className="h-4 w-4" />
+                {isSending ? "Sending…" : "Send Contract Email"}
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -274,11 +288,15 @@ function BookingsTable({
   onEdit,
   onConfirm,
   onCancel,
+  onSendContract,
+  sendingId,
 }: {
   rows: BookingRow[]
   onEdit: (booking: BookingRow) => void
   onConfirm: (id: string) => void
   onCancel: (id: string) => void
+  onSendContract: (id: string) => void
+  sendingId: string | null
 }) {
   return (
     <Table>
@@ -331,6 +349,8 @@ function BookingsTable({
                   onEdit={() => onEdit(booking)}
                   onConfirm={() => onConfirm(booking.id)}
                   onCancel={() => onCancel(booking.id)}
+                  onSendContract={() => onSendContract(booking.id)}
+                  isSending={sendingId === booking.id}
                 />
               </TableCell>
             </TableRow>
@@ -370,6 +390,7 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
   const [statusFilter, setStatusFilter] = useState("all-status")
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [sendingId, setSendingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [isPending, startTransition] = useTransition()
 
@@ -429,6 +450,18 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
         toast.success("Booking confirmed")
       } catch {
         toast.error("Failed to confirm booking")
+      }
+    })
+  }
+
+  function handleSendContract(id: string) {
+    setSendingId(id)
+    sendContractEmail(id).then(({ error }) => {
+      setSendingId(null)
+      if (error) {
+        toast.error(error)
+      } else {
+        toast.success("Contract email sent to customer")
       }
     })
   }
@@ -616,6 +649,8 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
                   onEdit={openEdit}
                   onConfirm={handleConfirm}
                   onCancel={handleCancel}
+                  onSendContract={handleSendContract}
+                  sendingId={sendingId}
                 />
               </TabsContent>
             ))}
