@@ -14,6 +14,7 @@ export async function createVehicle(data: {
   fuelType: FuelType
   transmission: Transmission
   seats: number
+  odometer?: number
   vin?: string
   notes?: string
 }) {
@@ -33,6 +34,7 @@ export async function updateVehicle(
     fuelType: FuelType
     transmission: Transmission
     seats: number
+    odometer?: number
     vin?: string
     notes?: string
   }

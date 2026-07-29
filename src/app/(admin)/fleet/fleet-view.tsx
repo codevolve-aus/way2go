@@ -94,6 +94,7 @@ type VehicleForm = {
   fuelType: FuelType
   transmission: Transmission
   seats: string
+  odometer: string
   vin: string
   notes: string
 }
@@ -210,6 +211,7 @@ const emptyForm: VehicleForm = {
   fuelType: "PETROL",
   transmission: "AUTOMATIC",
   seats: "5",
+  odometer: "0",
   vin: "",
   notes: "",
 }
@@ -254,6 +256,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
       fuelType: vehicle.fuelType,
       transmission: vehicle.transmission,
       seats: String(vehicle.seats),
+      odometer: String(vehicle.odometer),
       vin: vehicle.vin ?? "",
       notes: vehicle.notes ?? "",
     })
@@ -268,12 +271,17 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
     }
     const year = parseInt(form.year, 10)
     const seats = parseInt(form.seats, 10)
+    const odometer = parseFloat(form.odometer)
     if (isNaN(year) || year < 1990 || year > new Date().getFullYear() + 1) {
       toast.error("Enter a valid year")
       return
     }
     if (isNaN(seats) || seats < 1) {
       toast.error("Enter a valid seat count")
+      return
+    }
+    if (isNaN(odometer) || odometer < 0) {
+      toast.error("Enter a valid odometer reading")
       return
     }
     const payload = {
@@ -286,6 +294,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
       fuelType: form.fuelType,
       transmission: form.transmission,
       seats,
+      odometer,
       vin: form.vin || undefined,
       notes: form.notes || undefined,
     }
@@ -608,6 +617,17 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
                 value={form.seats}
                 onChange={(e) => setForm((f) => ({ ...f, seats: e.target.value }))}
                 placeholder="5"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Odometer (km)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={form.odometer}
+                onChange={(e) => setForm((f) => ({ ...f, odometer: e.target.value }))}
+                placeholder="0"
                 required
               />
             </div>
