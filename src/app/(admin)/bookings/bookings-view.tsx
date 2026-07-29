@@ -12,8 +12,11 @@ import {
   CheckCircle2,
   Car,
   RotateCcw,
+  CalendarIcon,
 } from "lucide-react"
 import { toast } from "sonner"
+import { format } from "date-fns"
+import type { Matcher } from "react-day-picker"
 import type { Booking, Customer, Vehicle, BookingStatus, BookingSource } from "@/generated/prisma"
 
 import {
@@ -57,6 +60,12 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -116,6 +125,73 @@ function SourceBadge({ source }: { source: BookingSource }) {
     <Badge variant="outline" className="font-mono text-[10px] tracking-wide">
       {SOURCE_LABELS[source]}
     </Badge>
+  )
+}
+
+function DatePickerField({
+  label,
+  value,
+  onChange,
+  bookedRanges = [],
+  minDate,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  bookedRanges?: { from: Date; to: Date }[]
+  minDate?: Date
+  required?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = value ? new Date(value + "T12:00:00") : undefined
+
+  function handleSelect(date: Date | undefined) {
+    if (!date) return
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, "0")
+    const d = String(date.getDate()).padStart(2, "0")
+    onChange(`${y}-${m}-${d}`)
+    setOpen(false)
+  }
+
+  const disabledMatchers: Matcher[] = [
+    ...bookedRanges,
+    ...(minDate ? [{ before: minDate } as Matcher] : []),
+  ]
+
+  return (
+    <div className="space-y-1.5">
+      <Label>
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      <Popover open={open} onOpenChange={(o) => setOpen(o)}>
+        <PopoverTrigger
+          render={
+            <Button variant="outline" className="w-full justify-start font-normal">
+              <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+              {selected ? (
+                format(selected, "dd MMM yyyy")
+              ) : (
+                <span className="text-muted-foreground">Pick a date</span>
+              )}
+            </Button>
+          }
+        />
+        <PopoverContent align="start" className="w-auto p-0">
+          <Calendar
+            mode="single"
+            selected={selected}
+            onSelect={handleSelect}
+            disabled={disabledMatchers.length ? disabledMatchers : undefined}
+            modifiers={bookedRanges.length ? { booked: bookedRanges } : undefined}
+            modifiersClassNames={{ booked: "line-through opacity-50" }}
+            defaultMonth={selected ?? new Date()}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 }
 
@@ -368,8 +444,27 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
     })
   }
 
+  const bookedRanges = form.vehicleId
+    ? bookings
+        .filter(
+          (b) =>
+            b.vehicleId === form.vehicleId &&
+            (b.status === "CONFIRMED" || b.status === "ACTIVE" || b.status === "PENDING") &&
+            b.id !== editingId
+        )
+        .map((b) => ({ from: b.pickupDate, to: b.returnDate }))
+    : []
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.pickupDate || !form.returnDate) {
+      toast.error("Please select pickup and return dates")
+      return
+    }
+    if (form.returnDate < form.pickupDate) {
+      toast.error("Return date must be after pickup date")
+      return
+    }
     const payload = {
       customerId: form.customerId,
       vehicleId: form.vehicleId,
@@ -567,24 +662,29 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Pickup Date</Label>
-              <Input
-                type="date"
-                value={form.pickupDate}
-                onChange={(e) => setForm((f) => ({ ...f, pickupDate: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Return Date</Label>
-              <Input
-                type="date"
-                value={form.returnDate}
-                onChange={(e) => setForm((f) => ({ ...f, returnDate: e.target.value }))}
-                required
-              />
-            </div>
+            <DatePickerField
+              label="Pickup Date"
+              value={form.pickupDate}
+              onChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  pickupDate: v,
+                  returnDate: f.returnDate && f.returnDate < v ? "" : f.returnDate,
+                }))
+              }
+              bookedRanges={bookedRanges}
+              required
+            />
+            <DatePickerField
+              label="Return Date"
+              value={form.returnDate}
+              onChange={(v) => setForm((f) => ({ ...f, returnDate: v }))}
+              bookedRanges={bookedRanges}
+              minDate={
+                form.pickupDate ? new Date(form.pickupDate + "T12:00:00") : undefined
+              }
+              required
+            />
             <div className="space-y-1.5">
               <Label>Pickup Location</Label>
               <Input
