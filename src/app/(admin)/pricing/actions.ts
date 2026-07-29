@@ -15,6 +15,15 @@ export async function createRentalRate(data: {
   revalidatePath("/pricing")
 }
 
+export async function updateRentalRate(id: string, data: {
+  dailyRate: number
+  weeklyRate?: number
+  monthlyRate?: number
+}) {
+  await db.rentalRate.update({ where: { id }, data })
+  revalidatePath("/pricing")
+}
+
 export async function createDiscountCode(data: {
   code: string
   description?: string

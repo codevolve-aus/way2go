@@ -70,7 +70,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-import { createCustomer, blacklistCustomer, unblacklistCustomer } from "./actions"
+import { createCustomer, blacklistCustomer, unblacklistCustomer, updateCustomer } from "./actions"
 
 interface CustomersViewProps {
   customers: Customer[]
@@ -94,6 +94,7 @@ export function CustomersView({ customers }: CustomersViewProps) {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all-status")
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [blacklistReason, setBlacklistReason] = useState("")
   const [isPending, startTransition] = useTransition()
@@ -119,24 +120,57 @@ export function CustomersView({ customers }: CustomersViewProps) {
     setForm(emptyForm)
   }
 
+  function openAdd() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setOpen(true)
+  }
+
+  function openEdit(customer: Customer) {
+    setEditingId(customer.id)
+    setForm({
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      email: customer.email,
+      phone: customer.phone,
+      licenceNo: customer.licenceNo ?? "",
+      licenceState: customer.licenceState ?? "",
+      address: customer.address ?? "",
+    })
+    setOpen(true)
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
       try {
-        await createCustomer({
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email: form.email,
-          phone: form.phone,
-          licenceNo: form.licenceNo || undefined,
-          licenceState: form.licenceState || undefined,
-          address: form.address || undefined,
-        })
-        toast.success("Customer created successfully")
+        if (editingId) {
+          await updateCustomer(editingId, {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            email: form.email,
+            phone: form.phone,
+            licenceNo: form.licenceNo || undefined,
+            licenceState: form.licenceState || undefined,
+            address: form.address || undefined,
+          })
+          toast.success("Customer updated successfully")
+        } else {
+          await createCustomer({
+            firstName: form.firstName,
+            lastName: form.lastName,
+            email: form.email,
+            phone: form.phone,
+            licenceNo: form.licenceNo || undefined,
+            licenceState: form.licenceState || undefined,
+            address: form.address || undefined,
+          })
+          toast.success("Customer created successfully")
+        }
         setOpen(false)
         resetForm()
       } catch {
-        toast.error("Failed to create customer")
+        toast.error(editingId ? "Failed to update customer" : "Failed to create customer")
       }
     })
   }
@@ -178,7 +212,7 @@ export function CustomersView({ customers }: CustomersViewProps) {
             Manage customer accounts and rental history
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button onClick={openAdd}>
           <Plus className="h-4 w-4" />
           New Customer
         </Button>
@@ -314,19 +348,19 @@ export function CustomersView({ customers }: CustomersViewProps) {
                           />
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onSelect={() => toast.info(`Viewing profile for ${fullName}`)}
+                              onClick={() => toast.info(`Viewing profile for ${fullName}`)}
                             >
                               <UserRound className="h-4 w-4" />
                               View Profile
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onSelect={() => toast.info(`Creating booking for ${fullName}`)}
+                              onClick={() => toast.info(`Creating booking for ${fullName}`)}
                             >
                               <BookPlus className="h-4 w-4" />
                               New Booking
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onSelect={() => toast.info(`Editing ${fullName}`)}
+                              onClick={() => setTimeout(() => openEdit(customer), 0)}
                             >
                               <PenLine className="h-4 w-4" />
                               Edit
@@ -378,7 +412,7 @@ export function CustomersView({ customers }: CustomersViewProps) {
                               </AlertDialog>
                             ) : (
                               <DropdownMenuItem
-                                onSelect={() => handleUnblacklist(customer.id, fullName)}
+                                onClick={() => handleUnblacklist(customer.id, fullName)}
                                 disabled={isPending}
                               >
                                 <ShieldCheck className="h-4 w-4" />
@@ -397,11 +431,11 @@ export function CustomersView({ customers }: CustomersViewProps) {
         </CardContent>
       </Card>
 
-      {/* New Customer Sheet */}
+      {/* New / Edit Customer Sheet */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>New Customer</SheetTitle>
+            <SheetTitle>{editingId ? "Edit Customer" : "New Customer"}</SheetTitle>
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
@@ -471,7 +505,9 @@ export function CustomersView({ customers }: CustomersViewProps) {
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Creating…" : "Create Customer"}
+                {isPending
+                  ? editingId ? "Saving…" : "Creating…"
+                  : editingId ? "Save Changes" : "Create Customer"}
               </Button>
             </SheetFooter>
           </form>

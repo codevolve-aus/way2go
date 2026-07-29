@@ -1,16 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
   CalendarClock,
   AlertTriangle,
   Wrench,
   Plus,
   CheckCircle2,
-  Pencil,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
+import type { MaintenanceType } from "@/generated/prisma"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -51,8 +51,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+import {
+  createMaintenanceRecord,
+  updateMaintenanceStatus,
+  deleteMaintenanceRecord,
+} from "./actions"
+
+type VehicleOption = { id: string; make: string; model: string; registrationNo: string }
+
 type MaintenanceRecord = {
   id: string
+  vehicleId: string
   vehicle: string
   type: string
   scheduledDate: string
@@ -123,16 +132,16 @@ function fmtCurrency(n: number) {
 }
 
 const emptyForm = {
-  vehicle: "",
-  type: "SERVICE",
+  vehicleId: "",
+  type: "SERVICE" as MaintenanceType,
   description: "",
   cost: "",
   date: "",
-  nextDue: "",
 }
 
 interface MaintenanceViewProps {
   maintenanceRecords: MaintenanceRecord[]
+  vehicles: VehicleOption[]
   upcoming: number
   overdue: number
   inProgress: number
@@ -140,6 +149,7 @@ interface MaintenanceViewProps {
 
 export function MaintenanceView({
   maintenanceRecords,
+  vehicles,
   upcoming,
   overdue,
   inProgress,
@@ -149,6 +159,7 @@ export function MaintenanceView({
   const [statusFilter, setStatusFilter] = useState("all")
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [isPending, startTransition] = useTransition()
 
   const filtered = maintenanceRecords.filter((r) => {
     const matchSearch =
@@ -163,9 +174,26 @@ export function MaintenanceView({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    toast.success("Maintenance record created successfully")
-    setOpen(false)
-    setForm(emptyForm)
+    if (!form.vehicleId) {
+      toast.error("Please select a vehicle")
+      return
+    }
+    startTransition(async () => {
+      try {
+        await createMaintenanceRecord({
+          vehicleId: form.vehicleId,
+          type: form.type,
+          scheduledDate: new Date(form.date),
+          description: form.description || undefined,
+          cost: form.cost ? parseFloat(form.cost) : undefined,
+        })
+        toast.success("Maintenance record scheduled")
+        setOpen(false)
+        setForm(emptyForm)
+      } catch {
+        toast.error("Failed to schedule maintenance")
+      }
+    })
   }
 
   return (
@@ -314,18 +342,20 @@ export function MaintenanceView({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => toast.success(`${r.id} marked as completed`)}
+                            disabled={isPending}
+                            onClick={() =>
+                              startTransition(async () => {
+                                try {
+                                  await updateMaintenanceStatus(r.id, "COMPLETED")
+                                  toast.success("Marked as completed")
+                                } catch {
+                                  toast.error("Failed")
+                                }
+                              })
+                            }
                           >
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                             Complete
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toast.info(`Editing record ${r.id}`)}
-                          >
-                            <Pencil className="h-4 w-4 mr-1" />
-                            Edit
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger
@@ -340,14 +370,23 @@ export function MaintenanceView({
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Cancel this maintenance record?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Maintenance record {r.id} for {r.vehicle} will be cancelled.
+                                  Maintenance record for {r.vehicle} will be cancelled.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Keep Record</AlertDialogCancel>
                                 <AlertDialogAction
                                   variant="destructive"
-                                  onClick={() => toast.success(`Maintenance record ${r.id} cancelled`)}
+                                  onClick={() =>
+                                    startTransition(async () => {
+                                      try {
+                                        await deleteMaintenanceRecord(r.id)
+                                        toast.success("Maintenance record cancelled")
+                                      } catch {
+                                        toast.error("Failed")
+                                      }
+                                    })
+                                  }
                                 >
                                   Yes, Cancel
                                 </AlertDialogAction>
@@ -365,7 +404,7 @@ export function MaintenanceView({
         </CardContent>
       </Card>
 
-      {/* New Maintenance Record Sheet */}
+      {/* Schedule Service Sheet */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="sm:max-w-md overflow-y-auto">
           <SheetHeader>
@@ -374,28 +413,36 @@ export function MaintenanceView({
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
               <Label>Vehicle</Label>
-              <Input
-                value={form.vehicle}
-                onChange={(e) => setForm((f) => ({ ...f, vehicle: e.target.value }))}
-                placeholder="Toyota Camry (ABC-123)"
-                required
-              />
+              <Select
+                value={form.vehicleId}
+                onValueChange={(v) => setForm((f) => ({ ...f, vehicleId: v ?? "" }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select vehicle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.make} {v.model} ({v.registrationNo})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
               <Select
                 value={form.type}
-                onValueChange={(v) => setForm((f) => ({ ...f, type: v ?? "SERVICE" }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, type: (v ?? "SERVICE") as MaintenanceType }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SERVICE">Service</SelectItem>
-                  <SelectItem value="REPAIR">Repair</SelectItem>
-                  <SelectItem value="INSPECTION">Inspection</SelectItem>
-                  <SelectItem value="CLEANING">Cleaning</SelectItem>
+                  <SelectItem value="REGISTRATION">Registration</SelectItem>
                   <SelectItem value="TYRE_REPLACEMENT">Tyre Replacement</SelectItem>
+                  <SelectItem value="INSPECTION">Inspection</SelectItem>
                   <SelectItem value="BRAKE_SERVICE">Brake Service</SelectItem>
                   <SelectItem value="OIL_CHANGE">Oil Change</SelectItem>
                 </SelectContent>
@@ -430,19 +477,13 @@ export function MaintenanceView({
                 required
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>Next Due Date</Label>
-              <Input
-                type="date"
-                value={form.nextDue}
-                onChange={(e) => setForm((f) => ({ ...f, nextDue: e.target.value }))}
-              />
-            </div>
             <SheetFooter className="px-0">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Schedule Service</Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Scheduling…" : "Schedule Service"}
+              </Button>
             </SheetFooter>
           </form>
         </SheetContent>

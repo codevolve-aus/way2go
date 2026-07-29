@@ -31,3 +31,16 @@ export async function unblacklistCustomer(id: string) {
   })
   revalidatePath("/customers")
 }
+
+export async function updateCustomer(id: string, data: {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  licenceNo?: string
+  licenceState?: string
+  address?: string
+}) {
+  await db.customer.update({ where: { id }, data })
+  revalidatePath("/customers")
+}

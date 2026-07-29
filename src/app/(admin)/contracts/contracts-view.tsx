@@ -344,7 +344,7 @@ export function ContractsView({ contracts }: ContractsViewProps) {
                           />
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onSelect={() =>
+                              onClick={() =>
                                 toast.info(`Viewing contract ${contract.contractNumber}`)
                               }
                             >
@@ -352,7 +352,7 @@ export function ContractsView({ contracts }: ContractsViewProps) {
                               View
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onSelect={() =>
+                              onClick={() =>
                                 toast.info("PDF generation coming soon")
                               }
                             >

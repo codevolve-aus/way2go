@@ -324,22 +324,22 @@ export function DamageView({ reports, vehicles }: DamageViewProps) {
                           }
                         />
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => handleStatusUpdate(r.id, "REPORTED")}>
+                          <DropdownMenuItem onClick={() => handleStatusUpdate(r.id, "REPORTED")}>
                             Reported
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleStatusUpdate(r.id, "ASSESSED")}>
+                          <DropdownMenuItem onClick={() => handleStatusUpdate(r.id, "ASSESSED")}>
                             Assessed
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleStatusUpdate(r.id, "REPAIR_IN_PROGRESS")}>
+                          <DropdownMenuItem onClick={() => handleStatusUpdate(r.id, "REPAIR_IN_PROGRESS")}>
                             In Repair
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleStatusUpdate(r.id, "REPAIRED")}>
+                          <DropdownMenuItem onClick={() => handleStatusUpdate(r.id, "REPAIRED")}>
                             Repaired
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleStatusUpdate(r.id, "CLAIM_FILED")}>
+                          <DropdownMenuItem onClick={() => handleStatusUpdate(r.id, "CLAIM_FILED")}>
                             Claim Filed
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleStatusUpdate(r.id, "RESOLVED")}>
+                          <DropdownMenuItem onClick={() => handleStatusUpdate(r.id, "RESOLVED")}>
                             Resolved
                           </DropdownMenuItem>
                         </DropdownMenuContent>

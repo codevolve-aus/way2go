@@ -20,3 +20,8 @@ export async function updateMaintenanceStatus(id: string, status: MaintenanceSta
   await db.maintenanceRecord.update({ where: { id }, data: { status } })
   revalidatePath("/maintenance")
 }
+
+export async function deleteMaintenanceRecord(id: string) {
+  await db.maintenanceRecord.delete({ where: { id } })
+  revalidatePath("/maintenance")
+}

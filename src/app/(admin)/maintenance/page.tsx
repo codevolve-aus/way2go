@@ -5,15 +5,23 @@ import { MaintenanceView } from "./maintenance-view"
 export const metadata: Metadata = { title: "Maintenance" }
 
 export default async function MaintenancePage() {
-  const records = await db.maintenanceRecord.findMany({
-    include: { vehicle: true },
-    orderBy: { scheduledDate: "desc" },
-  })
+  const [records, vehicles] = await Promise.all([
+    db.maintenanceRecord.findMany({
+      include: { vehicle: true },
+      orderBy: { scheduledDate: "desc" },
+    }),
+    db.vehicle.findMany({
+      where: { status: { not: "RETIRED" } },
+      select: { id: true, make: true, model: true, registrationNo: true },
+      orderBy: [{ make: "asc" }, { model: "asc" }],
+    }),
+  ])
 
   const now = new Date()
 
   const maintenanceRecords = records.map((r) => ({
     id: r.id,
+    vehicleId: r.vehicleId,
     vehicle: `${r.vehicle.make} ${r.vehicle.model} (${r.vehicle.registrationNo})`,
     type: r.type,
     scheduledDate: r.scheduledDate.toISOString(),
@@ -34,6 +42,7 @@ export default async function MaintenancePage() {
   return (
     <MaintenanceView
       maintenanceRecords={maintenanceRecords}
+      vehicles={vehicles}
       upcoming={upcoming}
       overdue={overdue}
       inProgress={inProgress}

@@ -5,20 +5,22 @@ import { PricingView } from "./pricing-view"
 export const metadata: Metadata = { title: "Pricing" }
 
 export default async function PricingPage() {
-  const [rates, rawCodes] = await Promise.all([
+  const [rates, rawCodes, categories] = await Promise.all([
     db.rentalRate.findMany({
       include: { category: true },
       orderBy: { createdAt: "desc" },
     }),
     db.discountCode.findMany({ orderBy: { createdAt: "desc" } }),
+    db.vehicleCategory.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ])
 
   const now = new Date()
 
   const rateCards = rates.map((r) => ({
     id: r.id,
+    categoryId: r.categoryId,
     category: r.category.name,
-    examples: r.name,
+    name: r.name,
     dailyRate: r.dailyRate,
     weeklyRate: r.weeklyRate ?? 0,
     monthlyRate: r.monthlyRate ?? 0,
@@ -43,5 +45,12 @@ export default async function PricingPage() {
     }
   })
 
-  return <PricingView rateCards={rateCards} extras={[]} discountCodes={discountCodes} />
+  return (
+    <PricingView
+      rateCards={rateCards}
+      extras={[]}
+      discountCodes={discountCodes}
+      categories={categories}
+    />
+  )
 }
