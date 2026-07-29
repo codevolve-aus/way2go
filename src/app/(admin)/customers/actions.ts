@@ -32,6 +32,11 @@ export async function unblacklistCustomer(id: string) {
   revalidatePath("/customers")
 }
 
+export async function deleteCustomer(id: string) {
+  await db.customer.delete({ where: { id } })
+  revalidatePath("/customers")
+}
+
 export async function updateCustomer(id: string, data: {
   firstName: string
   lastName: string

@@ -12,6 +12,7 @@ import {
   BookPlus,
   Ban,
   ShieldCheck,
+  Trash2,
   Plus,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -69,7 +70,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-import { createCustomer, blacklistCustomer, unblacklistCustomer, updateCustomer } from "./actions"
+import { createCustomer, blacklistCustomer, unblacklistCustomer, updateCustomer, deleteCustomer } from "./actions"
 
 interface CustomersViewProps {
   customers: Customer[]
@@ -86,6 +87,7 @@ function CustomerActionsMenu({
   onEdit,
   onBlacklist,
   onUnblacklist,
+  onDelete,
 }: {
   customer: Customer
   fullName: string
@@ -93,8 +95,10 @@ function CustomerActionsMenu({
   onEdit: () => void
   onBlacklist: (reason: string) => void
   onUnblacklist: () => void
+  onDelete: () => void
 }) {
   const [blacklistOpen, setBlacklistOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [reason, setReason] = useState("")
 
   return (
@@ -131,6 +135,12 @@ function CustomerActionsMenu({
               <ShieldCheck className="h-4 w-4" />Unblacklist
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setTimeout(() => setDeleteOpen(true), 0)}
+          >
+            <Trash2 className="h-4 w-4" />Delete
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -162,6 +172,27 @@ function CustomerActionsMenu({
               }}
             >
               Yes, Blacklist
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {fullName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove {fullName} from the system. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Customer</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => { onDelete(); setDeleteOpen(false) }}
+            >
+              Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -271,6 +302,17 @@ export function CustomersView({ customers }: CustomersViewProps) {
         toast.success(`${name} has been blacklisted`)
       } catch {
         toast.error("Failed to blacklist customer")
+      }
+    })
+  }
+
+  function handleDelete(id: string, name: string) {
+    startTransition(async () => {
+      try {
+        await deleteCustomer(id)
+        toast.success(`${name} has been deleted`)
+      } catch {
+        toast.error("Failed to delete customer")
       }
     })
   }
@@ -428,6 +470,7 @@ export function CustomersView({ customers }: CustomersViewProps) {
                           onEdit={() => setTimeout(() => openEdit(customer), 0)}
                           onBlacklist={(reason) => handleBlacklist(customer.id, fullName, reason)}
                           onUnblacklist={() => handleUnblacklist(customer.id, fullName)}
+                          onDelete={() => handleDelete(customer.id, fullName)}
                         />
                       </TableCell>
                     </TableRow>
