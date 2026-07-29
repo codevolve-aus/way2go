@@ -69,7 +69,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-import { createBooking, updateBookingStatus } from "./actions"
+import { createBooking, updateBooking, updateBookingStatus } from "./actions"
 
 type BookingRow = Booking & { customer: Customer; vehicle: Vehicle }
 type CustomerOption = Pick<Customer, "id" | "firstName" | "lastName">
@@ -121,10 +121,12 @@ function SourceBadge({ source }: { source: BookingSource }) {
 
 function BookingActionsMenu({
   booking,
+  onEdit,
   onConfirm,
   onCancel,
 }: {
   booking: BookingRow
+  onEdit: () => void
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -143,7 +145,7 @@ function BookingActionsMenu({
           <Eye className="h-4 w-4" />
           View
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => toast.info(`Editing booking ${booking.bookingNumber}`)}>
+        <DropdownMenuItem onClick={() => setTimeout(onEdit, 0)}>
           <PenLine className="h-4 w-4" />
           Edit
         </DropdownMenuItem>
@@ -187,10 +189,12 @@ function BookingActionsMenu({
 
 function BookingsTable({
   rows,
+  onEdit,
   onConfirm,
   onCancel,
 }: {
   rows: BookingRow[]
+  onEdit: (booking: BookingRow) => void
   onConfirm: (id: string) => void
   onCancel: (id: string) => void
 }) {
@@ -242,6 +246,7 @@ function BookingsTable({
               <TableCell className="pr-4 text-right">
                 <BookingActionsMenu
                   booking={booking}
+                  onEdit={() => onEdit(booking)}
                   onConfirm={() => onConfirm(booking.id)}
                   onCancel={() => onCancel(booking.id)}
                 />
@@ -282,6 +287,7 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all-status")
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [isPending, startTransition] = useTransition()
 
@@ -309,6 +315,31 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
     return matchSearch && matchStatus
   })
 
+  function toDateInput(d: Date | string): string {
+    const date = d instanceof Date ? d : new Date(d)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+  }
+
+  function openAdd() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setOpen(true)
+  }
+
+  function openEdit(booking: BookingRow) {
+    setEditingId(booking.id)
+    setForm({
+      customerId: booking.customerId,
+      vehicleId: booking.vehicleId,
+      pickupDate: toDateInput(booking.pickupDate),
+      returnDate: toDateInput(booking.returnDate),
+      pickupLocation: booking.pickupLocation,
+      source: booking.source,
+      notes: booking.notes ?? "",
+    })
+    setOpen(true)
+  }
+
   function handleConfirm(id: string) {
     startTransition(async () => {
       try {
@@ -333,22 +364,28 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const payload = {
+      customerId: form.customerId,
+      vehicleId: form.vehicleId,
+      pickupDate: form.pickupDate,
+      returnDate: form.returnDate,
+      pickupLocation: form.pickupLocation,
+      source: form.source,
+      notes: form.notes || undefined,
+    }
     startTransition(async () => {
       try {
-        await createBooking({
-          customerId: form.customerId,
-          vehicleId: form.vehicleId,
-          pickupDate: form.pickupDate,
-          returnDate: form.returnDate,
-          pickupLocation: form.pickupLocation,
-          source: form.source,
-          notes: form.notes || undefined,
-        })
-        toast.success("Booking created successfully")
+        if (editingId) {
+          await updateBooking(editingId, payload)
+          toast.success("Booking updated successfully")
+        } else {
+          await createBooking(payload)
+          toast.success("Booking created successfully")
+        }
         setOpen(false)
         setForm(emptyForm)
       } catch {
-        toast.error("Failed to create booking")
+        toast.error(editingId ? "Failed to update booking" : "Failed to create booking")
       }
     })
   }
@@ -363,7 +400,7 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
             Track and manage all vehicle rental bookings
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button onClick={openAdd}>
           <Plus className="h-4 w-4" />
           New Booking
         </Button>
@@ -475,6 +512,7 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
               <TabsContent key={tab} value={tab}>
                 <BookingsTable
                   rows={filtered.filter(tabFilters[tab])}
+                  onEdit={openEdit}
                   onConfirm={handleConfirm}
                   onCancel={handleCancel}
                 />
@@ -488,7 +526,7 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>New Booking</SheetTitle>
+            <SheetTitle>{editingId ? "Edit Booking" : "New Booking"}</SheetTitle>
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4 px-4">
             <div className="space-y-1.5">
@@ -583,7 +621,9 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Creating..." : "Create Booking"}
+                {isPending
+                  ? editingId ? "Saving..." : "Creating..."
+                  : editingId ? "Save Changes" : "Create Booking"}
               </Button>
             </SheetFooter>
           </form>

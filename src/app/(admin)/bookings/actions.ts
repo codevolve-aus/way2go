@@ -36,6 +36,33 @@ export async function createBooking(data: {
   revalidatePath("/bookings")
 }
 
+export async function updateBooking(
+  id: string,
+  data: {
+    customerId: string
+    vehicleId: string
+    pickupDate: string
+    returnDate: string
+    pickupLocation: string
+    source: BookingSource
+    notes?: string
+  }
+) {
+  await db.booking.update({
+    where: { id },
+    data: {
+      customerId: data.customerId,
+      vehicleId: data.vehicleId,
+      pickupDate: new Date(data.pickupDate),
+      returnDate: new Date(data.returnDate),
+      pickupLocation: data.pickupLocation,
+      source: data.source,
+      notes: data.notes || null,
+    },
+  })
+  revalidatePath("/bookings")
+}
+
 export async function updateBookingStatus(id: string, status: BookingStatus) {
   await db.booking.update({ where: { id }, data: { status } })
   revalidatePath("/bookings")
