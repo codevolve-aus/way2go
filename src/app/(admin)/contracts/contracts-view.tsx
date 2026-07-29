@@ -63,7 +63,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 import { voidContract } from "./actions"
@@ -107,6 +106,78 @@ function StatusBadge({ status }: { status: ContractStatus }) {
     case "DISPUTED":
       return <Badge variant="destructive">Disputed</Badge>
   }
+}
+
+function ContractActionsMenu({
+  contract,
+  isPending,
+  onVoid,
+}: {
+  contract: ContractRow
+  isPending: boolean
+  onVoid: () => void
+}) {
+  const [voidOpen, setVoidOpen] = useState(false)
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={() => toast.info(`Viewing contract ${contract.contractNumber}`)}
+          >
+            <Eye className="h-4 w-4" />
+            View
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => toast.info("PDF generation coming soon")}>
+            <Download className="h-4 w-4" />
+            Download PDF
+          </DropdownMenuItem>
+          {contract.status !== "CLOSED" && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setTimeout(() => setVoidOpen(true), 0)}
+              >
+                <X className="h-4 w-4" />
+                Void Contract
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={voidOpen} onOpenChange={setVoidOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Void this contract?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Contract {contract.contractNumber} will be voided. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Contract</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => { onVoid(); setVoidOpen(false) }}
+            >
+              Yes, Void
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
 }
 
 interface ContractsViewProps {
@@ -333,73 +404,11 @@ export function ContractsView({ contracts }: ContractsViewProps) {
                         {fmtDate(contract.createdAt)}
                       </TableCell>
                       <TableCell className="pr-4 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Open menu</span>
-                              </Button>
-                            }
-                          />
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toast.info(`Viewing contract ${contract.contractNumber}`)
-                              }
-                            >
-                              <Eye className="h-4 w-4" />
-                              View
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toast.info("PDF generation coming soon")
-                              }
-                            >
-                              <Download className="h-4 w-4" />
-                              Download PDF
-                            </DropdownMenuItem>
-                            {contract.status !== "CLOSED" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <AlertDialog>
-                                  <AlertDialogTrigger
-                                    render={
-                                      <DropdownMenuItem
-                                        variant="destructive"
-                                        onSelect={(e) => e.preventDefault()}
-                                      >
-                                        <X className="h-4 w-4" />
-                                        Void Contract
-                                      </DropdownMenuItem>
-                                    }
-                                  />
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Void this contract?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Contract {contract.contractNumber} will be voided. This
-                                        action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Keep Contract</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        variant="destructive"
-                                        disabled={isPending}
-                                        onClick={() =>
-                                          handleVoid(contract.id, contract.contractNumber)
-                                        }
-                                      >
-                                        Yes, Void
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <ContractActionsMenu
+                          contract={contract}
+                          isPending={isPending}
+                          onVoid={() => handleVoid(contract.id, contract.contractNumber)}
+                        />
                       </TableCell>
                     </TableRow>
                   )

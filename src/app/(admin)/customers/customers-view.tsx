@@ -67,7 +67,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 import { createCustomer, blacklistCustomer, unblacklistCustomer, updateCustomer } from "./actions"
@@ -78,6 +77,97 @@ interface CustomersViewProps {
 
 function getInitials(firstName: string, lastName: string) {
   return `${firstName[0]}${lastName[0]}`.toUpperCase()
+}
+
+function CustomerActionsMenu({
+  customer,
+  fullName,
+  isPending,
+  onEdit,
+  onBlacklist,
+  onUnblacklist,
+}: {
+  customer: Customer
+  fullName: string
+  isPending: boolean
+  onEdit: () => void
+  onBlacklist: (reason: string) => void
+  onUnblacklist: () => void
+}) {
+  const [blacklistOpen, setBlacklistOpen] = useState(false)
+  const [reason, setReason] = useState("")
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => toast.info(`Viewing profile for ${fullName}`)}>
+            <UserRound className="h-4 w-4" />View Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => toast.info(`Creating booking for ${fullName}`)}>
+            <BookPlus className="h-4 w-4" />New Booking
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTimeout(onEdit, 0)}>
+            <PenLine className="h-4 w-4" />Edit
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {!customer.isBlacklisted ? (
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setTimeout(() => setBlacklistOpen(true), 0)}
+            >
+              <Ban className="h-4 w-4" />Blacklist
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={onUnblacklist} disabled={isPending}>
+              <ShieldCheck className="h-4 w-4" />Unblacklist
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={blacklistOpen} onOpenChange={(o) => { setBlacklistOpen(o); if (!o) setReason("") }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Blacklist this customer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {fullName} will be blacklisted and unable to make new bookings. Please provide a reason.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-6 pb-2">
+            <Textarea
+              placeholder="Reason for blacklisting..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setReason("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (!reason.trim()) { toast.error("Please enter a reason"); return }
+                onBlacklist(reason)
+                setBlacklistOpen(false)
+                setReason("")
+              }}
+            >
+              Yes, Blacklist
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
 }
 
 const emptyForm = {
@@ -96,7 +186,6 @@ export function CustomersView({ customers }: CustomersViewProps) {
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
-  const [blacklistReason, setBlacklistReason] = useState("")
   const [isPending, startTransition] = useTransition()
 
   const totalCustomers = customers.length
@@ -175,16 +264,11 @@ export function CustomersView({ customers }: CustomersViewProps) {
     })
   }
 
-  function handleBlacklist(id: string, name: string) {
-    if (!blacklistReason.trim()) {
-      toast.error("Please enter a reason for blacklisting")
-      return
-    }
+  function handleBlacklist(id: string, name: string, reason: string) {
     startTransition(async () => {
       try {
-        await blacklistCustomer(id, blacklistReason)
+        await blacklistCustomer(id, reason)
         toast.success(`${name} has been blacklisted`)
-        setBlacklistReason("")
       } catch {
         toast.error("Failed to blacklist customer")
       }
@@ -337,90 +421,14 @@ export function CustomersView({ customers }: CustomersViewProps) {
                         )}
                       </TableCell>
                       <TableCell className="pr-4 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Open menu</span>
-                              </Button>
-                            }
-                          />
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => toast.info(`Viewing profile for ${fullName}`)}
-                            >
-                              <UserRound className="h-4 w-4" />
-                              View Profile
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => toast.info(`Creating booking for ${fullName}`)}
-                            >
-                              <BookPlus className="h-4 w-4" />
-                              New Booking
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => setTimeout(() => openEdit(customer), 0)}
-                            >
-                              <PenLine className="h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {!customer.isBlacklisted ? (
-                              <AlertDialog>
-                                <AlertDialogTrigger
-                                  render={
-                                    <DropdownMenuItem
-                                      variant="destructive"
-                                      onSelect={(e) => e.preventDefault()}
-                                    >
-                                      <Ban className="h-4 w-4" />
-                                      Blacklist
-                                    </DropdownMenuItem>
-                                  }
-                                />
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Blacklist this customer?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      {fullName} will be blacklisted and unable to make new
-                                      bookings. Please provide a reason.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <div className="px-6 pb-2">
-                                    <Textarea
-                                      placeholder="Reason for blacklisting..."
-                                      value={blacklistReason}
-                                      onChange={(e) => setBlacklistReason(e.target.value)}
-                                      rows={3}
-                                    />
-                                  </div>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel
-                                      onClick={() => setBlacklistReason("")}
-                                    >
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      variant="destructive"
-                                      onClick={() => handleBlacklist(customer.id, fullName)}
-                                    >
-                                      Yes, Blacklist
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            ) : (
-                              <DropdownMenuItem
-                                onClick={() => handleUnblacklist(customer.id, fullName)}
-                                disabled={isPending}
-                              >
-                                <ShieldCheck className="h-4 w-4" />
-                                Unblacklist
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <CustomerActionsMenu
+                          customer={customer}
+                          fullName={fullName}
+                          isPending={isPending}
+                          onEdit={() => setTimeout(() => openEdit(customer), 0)}
+                          onBlacklist={(reason) => handleBlacklist(customer.id, fullName, reason)}
+                          onUnblacklist={() => handleUnblacklist(customer.id, fullName)}
+                        />
                       </TableCell>
                     </TableRow>
                   )

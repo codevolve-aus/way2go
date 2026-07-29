@@ -98,6 +98,108 @@ type VehicleForm = {
   notes: string
 }
 
+function VehicleActionsMenu({
+  vehicle, label, isPending,
+  onEdit, onSetAvailable, onSetMaintenance, onRetire, onDelete,
+}: {
+  vehicle: VehicleRow
+  label: string
+  isPending: boolean
+  onEdit: () => void
+  onSetAvailable: () => void
+  onSetMaintenance: () => void
+  onRetire: () => void
+  onDelete: () => void
+}) {
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false)
+  const [retireOpen, setRetireOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => toast.info(`Viewing ${label} (${vehicle.registrationNo})`)}>
+            <Eye className="h-4 w-4" />View
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTimeout(onEdit, 0)}>
+            <Pencil className="h-4 w-4" />Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => toast.info(`Viewing history for ${vehicle.registrationNo}`)}>
+            <History className="h-4 w-4" />View History
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onSetAvailable} disabled={isPending}>
+            <RefreshCw className="h-4 w-4" />Set Available
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTimeout(() => setMaintenanceOpen(true), 0)}>
+            <Wrench className="h-4 w-4" />Set Maintenance
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTimeout(() => setRetireOpen(true), 0)}>
+            <Archive className="h-4 w-4" />Retire
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={() => setTimeout(() => setDeleteOpen(true), 0)}>
+            <Trash2 className="h-4 w-4" />Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={maintenanceOpen} onOpenChange={setMaintenanceOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark {label} for maintenance?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This vehicle ({vehicle.registrationNo}) will be marked as under maintenance and unavailable for new bookings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { onSetMaintenance(); setMaintenanceOpen(false) }}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={retireOpen} onOpenChange={setRetireOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retire {label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This vehicle ({vehicle.registrationNo}) will be retired and removed from active service.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { onRetire(); setRetireOpen(false) }}>Yes, Retire</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove {vehicle.registrationNo} from your fleet. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { onDelete(); setDeleteOpen(false) }}>Yes, Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
 const emptyForm: VehicleForm = {
   make: "",
   model: "",
@@ -361,134 +463,16 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
                       {fmtDate(vehicle.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Open menu</span>
-                            </Button>
-                          }
-                        />
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              toast.info(`Viewing ${label} (${vehicle.registrationNo})`)
-                            }
-                          >
-                            <Eye className="h-4 w-4" />
-                            View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setTimeout(() => openEdit(vehicle), 0)}>
-                            <Pencil className="h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              toast.info(`Viewing history for ${vehicle.registrationNo}`)
-                            }
-                          >
-                            <History className="h-4 w-4" />
-                            View History
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onSelect={() => handleSetAvailable(vehicle.id, label)}
-                            disabled={isPending}
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                            Set Available
-                          </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger
-                              render={
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <Wrench className="h-4 w-4" />
-                                  Set Maintenance
-                                </DropdownMenuItem>
-                              }
-                            />
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Mark {label} for maintenance?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This vehicle ({vehicle.registrationNo}) will be marked as under
-                                  maintenance and unavailable for new bookings.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleSetMaintenance(vehicle.id, label)}
-                                >
-                                  Confirm
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                          <AlertDialog>
-                            <AlertDialogTrigger
-                              render={
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <Archive className="h-4 w-4" />
-                                  Retire
-                                </DropdownMenuItem>
-                              }
-                            />
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Retire {label}?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This vehicle ({vehicle.registrationNo}) will be retired and
-                                  removed from active service.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => handleRetire(vehicle.id, label)}
-                                >
-                                  Yes, Retire
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                          <AlertDialog>
-                            <AlertDialogTrigger
-                              render={
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onSelect={(e) => e.preventDefault()}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              }
-                            />
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete {label}?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently remove {vehicle.registrationNo} from your
-                                  fleet. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => handleDelete(vehicle.id, label)}
-                                >
-                                  Yes, Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <VehicleActionsMenu
+                        vehicle={vehicle}
+                        label={label}
+                        isPending={isPending}
+                        onEdit={() => openEdit(vehicle)}
+                        onSetAvailable={() => handleSetAvailable(vehicle.id, label)}
+                        onSetMaintenance={() => handleSetMaintenance(vehicle.id, label)}
+                        onRetire={() => handleRetire(vehicle.id, label)}
+                        onDelete={() => handleDelete(vehicle.id, label)}
+                      />
                     </TableCell>
                   </TableRow>
                 )

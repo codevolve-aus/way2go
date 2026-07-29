@@ -130,60 +130,66 @@ function BookingActionsMenu({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const [cancelOpen, setCancelOpen] = useState(false)
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-4 w-4" />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => toast.info(`Viewing booking ${booking.bookingNumber}`)}>
-          <Eye className="h-4 w-4" />
-          View
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTimeout(onEdit, 0)}>
-          <PenLine className="h-4 w-4" />
-          Edit
-        </DropdownMenuItem>
-        {booking.status === "PENDING" && (
-          <DropdownMenuItem onSelect={onConfirm}>
-            <CheckCircle2 className="h-4 w-4" />
-            Confirm
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => toast.info(`Viewing booking ${booking.bookingNumber}`)}>
+            <Eye className="h-4 w-4" />
+            View
           </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <AlertDialog>
-          <AlertDialogTrigger
-            render={
-              <DropdownMenuItem variant="destructive" onSelect={(e) => e.preventDefault()}>
-                <X className="h-4 w-4" />
-                Cancel
-              </DropdownMenuItem>
-            }
-          />
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Booking {booking.bookingNumber} for{" "}
-                {booking.customer.firstName} {booking.customer.lastName} will be cancelled. This
-                action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={onCancel}>
-                Yes, Cancel
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuItem onClick={() => setTimeout(onEdit, 0)}>
+            <PenLine className="h-4 w-4" />
+            Edit
+          </DropdownMenuItem>
+          {booking.status === "PENDING" && (
+            <DropdownMenuItem onClick={onConfirm}>
+              <CheckCircle2 className="h-4 w-4" />
+              Confirm
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setTimeout(() => setCancelOpen(true), 0)}
+          >
+            <X className="h-4 w-4" />
+            Cancel
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Booking {booking.bookingNumber} for {booking.customer.firstName}{" "}
+              {booking.customer.lastName} will be cancelled. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => { onCancel(); setCancelOpen(false) }}
+            >
+              Yes, Cancel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
