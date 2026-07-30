@@ -205,12 +205,12 @@ const TERMS: { heading: string; body: string }[] = [
   {
     heading: "6. DAMAGE AND LIABILITY",
     body:
-      "The renter accepts full financial liability for all damage to the vehicle, including overhead and underbody damage, tyre and windscreen damage, regardless of fault, up to the applicable excess amount stated in this agreement. Damage caused by prohibited use, or by an unlisted driver, carries unlimited liability. All damage must be reported to Way2Go immediately.",
+      "The renter accepts full financial liability for all damage to the vehicle, including overhead and underbody damage, tyre and windscreen damage, regardless of fault, up to the applicable excess amount stated in this agreement. Damage caused by prohibited use, or by an unlisted driver, carries unlimited liability. All damage must be reported to WayZo immediately.",
   },
   {
     heading: "7. INSURANCE",
     body:
-      "Compulsory Third Party (CTP) insurance is included. The vehicle is covered by Way2Go's comprehensive fleet insurance subject to the damage excess stated in this agreement. The renter's liability can be reduced by purchasing Damage Liability Reduction (DLR) at the time of rental. Insurance does not cover personal belongings left in the vehicle.",
+      "Compulsory Third Party (CTP) insurance is included. The vehicle is covered by WayZo's comprehensive fleet insurance subject to the damage excess stated in this agreement. The renter's liability can be reduced by purchasing Damage Liability Reduction (DLR) at the time of rental. Insurance does not cover personal belongings left in the vehicle.",
   },
   {
     heading: "8. PAYMENT AND SECURITY DEPOSIT",
@@ -225,7 +225,7 @@ const TERMS: { heading: string; body: string }[] = [
   {
     heading: "10. BREAKDOWN AND EMERGENCIES",
     body:
-      "In the event of a breakdown, accident, or theft, the renter must: (a) ensure the safety of all occupants; (b) contact emergency services if required; (c) contact Way2Go immediately on our 24-hour number; (d) not authorise any repairs without Way2Go's written consent; and (e) obtain a police report number for any accident or theft.",
+      "In the event of a breakdown, accident, or theft, the renter must: (a) ensure the safety of all occupants; (b) contact emergency services if required; (c) contact WayZo immediately on our 24-hour number; (d) not authorise any repairs without WayZo's written consent; and (e) obtain a police report number for any accident or theft.",
   },
   {
     heading: "11. RETURN CONDITION",
@@ -235,7 +235,7 @@ const TERMS: { heading: string; body: string }[] = [
   {
     heading: "12. PRIVACY",
     body:
-      "Way2Go Vehicle Rentals collects and uses personal information in accordance with the Australian Privacy Act 1988. Information provided in this agreement is used solely for rental administration, insurance, and compliance purposes. Your information will not be shared with third parties except as required by law or for the purposes of processing claims.",
+      "WayZo Vehicle Rentals collects and uses personal information in accordance with the Australian Privacy Act 1988. Information provided in this agreement is used solely for rental administration, insurance, and compliance purposes. Your information will not be shared with third parties except as required by law or for the purposes of processing claims.",
   },
   {
     heading: "13. GOVERNING LAW",
@@ -259,14 +259,14 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
   return (
     <Document
       title={`Rental Agreement ${data.contractNumber}`}
-      author="Way2Go Vehicle Rentals"
+      author="WayZo Vehicle Rentals"
     >
       {/* ── Page 1: Contract Details ── */}
       <Page size="A4" style={s.page}>
         {/* Header */}
         <View style={s.header}>
           <View>
-            <Text style={s.brand}>Way2Go</Text>
+            <Text style={s.brand}>WayZo</Text>
             <Text style={s.brandSub}>Vehicle Rentals</Text>
           </View>
           <View>
@@ -365,7 +365,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
 
         {/* Footer */}
         <View style={s.pageNumber}>
-          <Text>Way2Go Vehicle Rentals — Rental Agreement {data.contractNumber}</Text>
+          <Text>WayZo Vehicle Rentals — Rental Agreement {data.contractNumber}</Text>
           <Text>Page 1 of 2 — See overleaf for full Terms and Conditions</Text>
         </View>
       </Page>
@@ -374,7 +374,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
       <Page size="A4" style={s.page}>
         <View style={s.header}>
           <View>
-            <Text style={s.brand}>Way2Go</Text>
+            <Text style={s.brand}>WayZo</Text>
             <Text style={s.brandSub}>Vehicle Rentals</Text>
           </View>
           <View>
@@ -424,7 +424,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
         </View>
 
         <View style={s.pageNumber}>
-          <Text>Way2Go Vehicle Rentals — Rental Agreement {data.contractNumber}</Text>
+          <Text>WayZo Vehicle Rentals — Rental Agreement {data.contractNumber}</Text>
           <Text>Page 2 of 2</Text>
         </View>
       </Page>

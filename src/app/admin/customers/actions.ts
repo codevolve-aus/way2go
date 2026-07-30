@@ -13,7 +13,7 @@ export async function createCustomer(data: {
   address?: string
 }) {
   await db.customer.create({ data })
-  revalidatePath("/customers")
+  revalidatePath("/admin/customers")
 }
 
 export async function blacklistCustomer(id: string, reason: string) {
@@ -21,7 +21,7 @@ export async function blacklistCustomer(id: string, reason: string) {
     where: { id },
     data: { isBlacklisted: true, blacklistReason: reason },
   })
-  revalidatePath("/customers")
+  revalidatePath("/admin/customers")
 }
 
 export async function unblacklistCustomer(id: string) {
@@ -29,12 +29,12 @@ export async function unblacklistCustomer(id: string) {
     where: { id },
     data: { isBlacklisted: false, blacklistReason: null },
   })
-  revalidatePath("/customers")
+  revalidatePath("/admin/customers")
 }
 
 export async function deleteCustomer(id: string) {
   await db.customer.delete({ where: { id } })
-  revalidatePath("/customers")
+  revalidatePath("/admin/customers")
 }
 
 export async function updateCustomer(id: string, data: {
@@ -47,5 +47,5 @@ export async function updateCustomer(id: string, data: {
   address?: string
 }) {
   await db.customer.update({ where: { id }, data })
-  revalidatePath("/customers")
+  revalidatePath("/admin/customers")
 }

@@ -20,12 +20,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: { default: "Way2Go", template: "%s | Way2Go" },
-  description: "Vehicle rental administration system",
+  title: { default: "WayZo", template: "%s | WayZo" },
+  description:
+    "WayZo Vehicle Rentals — reliable car, SUV and van hire across Sydney. Browse our fleet and send a booking enquiry today.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Way2Go",
+    title: "WayZo",
   },
   icons: {
     apple: [{ url: "/icons/icon.svg" }],

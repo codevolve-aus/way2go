@@ -36,42 +36,42 @@ const navMain = [
   {
     label: "Overview",
     items: [
-      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     ],
   },
   {
     label: "Operations",
     items: [
-      { title: "Bookings", href: "/bookings", icon: CalendarDays },
-      { title: "Contracts", href: "/contracts", icon: FileText },
-      { title: "Calendar", href: "/calendar", icon: Calendar },
+      { title: "Bookings", href: "/admin/bookings", icon: CalendarDays },
+      { title: "Contracts", href: "/admin/contracts", icon: FileText },
+      { title: "Calendar", href: "/admin/calendar", icon: Calendar },
     ],
   },
   {
     label: "Fleet & Customers",
     items: [
-      { title: "Fleet", href: "/fleet", icon: Car },
-      { title: "Customers", href: "/customers", icon: Users },
+      { title: "Fleet", href: "/admin/fleet", icon: Car },
+      { title: "Customers", href: "/admin/customers", icon: Users },
     ],
   },
   {
     label: "Finance",
     items: [
-      { title: "Payments", href: "/payments", icon: DollarSign },
-      { title: "Pricing", href: "/pricing", icon: Tag },
+      { title: "Payments", href: "/admin/payments", icon: DollarSign },
+      { title: "Pricing", href: "/admin/pricing", icon: Tag },
     ],
   },
   {
     label: "Maintenance",
     items: [
-      { title: "Damage & Incidents", href: "/damage", icon: AlertTriangle },
-      { title: "Maintenance", href: "/maintenance", icon: Wrench },
+      { title: "Damage & Incidents", href: "/admin/damage", icon: AlertTriangle },
+      { title: "Maintenance", href: "/admin/maintenance", icon: Wrench },
     ],
   },
   {
     label: "Insights",
     items: [
-      { title: "Reports", href: "/reports", icon: BarChart3 },
+      { title: "Reports", href: "/admin/reports", icon: BarChart3 },
     ],
   },
 ];
@@ -116,8 +116,8 @@ function NavItems() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              render={<Link href="/settings" onClick={handleNavClick} />}
-              isActive={pathname.startsWith("/settings")}
+              render={<Link href="/admin/settings" onClick={handleNavClick} />}
+              isActive={pathname.startsWith("/admin/settings")}
               tooltip="Settings"
             >
               <Settings className="h-4 w-4" />
@@ -136,10 +136,10 @@ export function AppSidebar({ user }: { user?: Session["user"] }) {
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold text-sm shrink-0">
-            W2
+            WZ
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
-            <p className="text-sm font-semibold text-sidebar-foreground">Way2Go</p>
+            <p className="text-sm font-semibold text-sidebar-foreground">WayZo</p>
             <p className="text-xs text-sidebar-foreground/60">Vehicle Rentals</p>
           </div>
         </div>

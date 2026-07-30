@@ -9,10 +9,10 @@ export async function voidContract(id: string) {
     where: { id },
     data: { status: "CLOSED", closedAt: new Date() },
   })
-  revalidatePath("/contracts")
+  revalidatePath("/admin/contracts")
 }
 
 export async function updateContractStatus(id: string, status: ContractStatus) {
   await db.contract.update({ where: { id }, data: { status } })
-  revalidatePath("/contracts")
+  revalidatePath("/admin/contracts")
 }

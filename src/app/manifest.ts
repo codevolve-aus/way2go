@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Way2Go Vehicle Rentals",
-    short_name: "Way2Go",
+    name: "WayZo Vehicle Rentals",
+    short_name: "WayZo",
     description: "Vehicle rental administration system",
-    start_url: "/dashboard",
+    start_url: "/admin/dashboard",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#2563eb",

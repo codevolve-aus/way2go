@@ -26,13 +26,9 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user;
       const path = nextUrl.pathname;
 
-      const isPublicPath =
-        path.startsWith("/sign-in") ||
-        path.startsWith("/pending") ||
-        path.startsWith("/rejected") ||
-        path.startsWith("/api/auth");
-
-      if (isPublicPath) return true;
+      // Only the admin back office requires authentication — the public
+      // marketing site is open to everyone.
+      if (!path.startsWith("/admin")) return true;
 
       if (!isLoggedIn) {
         return Response.redirect(new URL("/sign-in", nextUrl));

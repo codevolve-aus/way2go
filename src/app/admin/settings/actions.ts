@@ -16,7 +16,7 @@ export async function approveUser(id: string) {
     where: { id },
     data: { status: "APPROVED" as UserStatus },
   });
-  revalidatePath("/settings");
+  revalidatePath("/admin/settings");
 }
 
 export async function rejectUser(id: string) {
@@ -25,7 +25,7 @@ export async function rejectUser(id: string) {
     where: { id },
     data: { status: "REJECTED" as UserStatus },
   });
-  revalidatePath("/settings");
+  revalidatePath("/admin/settings");
 }
 
 export async function updateUserRole(id: string, role: string) {
@@ -34,5 +34,5 @@ export async function updateUserRole(id: string, role: string) {
     where: { id },
     data: { role: role as StaffRole },
   });
-  revalidatePath("/settings");
+  revalidatePath("/admin/settings");
 }

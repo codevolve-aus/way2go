@@ -13,5 +13,5 @@ export async function createPayment(data: {
   notes?: string
 }) {
   await db.payment.create({ data })
-  revalidatePath("/payments")
+  revalidatePath("/admin/payments")
 }

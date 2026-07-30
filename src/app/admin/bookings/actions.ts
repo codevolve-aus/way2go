@@ -37,7 +37,7 @@ export async function createBooking(data: {
       status: "PENDING",
     },
   })
-  revalidatePath("/bookings")
+  revalidatePath("/admin/bookings")
 }
 
 export async function updateBooking(
@@ -64,12 +64,12 @@ export async function updateBooking(
       notes: data.notes || null,
     },
   })
-  revalidatePath("/bookings")
+  revalidatePath("/admin/bookings")
 }
 
 export async function updateBookingStatus(id: string, status: BookingStatus) {
   await db.booking.update({ where: { id }, data: { status } })
-  revalidatePath("/bookings")
+  revalidatePath("/admin/bookings")
 }
 
 export async function sendContractEmail(bookingId: string): Promise<{ error?: string }> {
@@ -159,18 +159,18 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
     day: "2-digit", month: "long", year: "numeric",
   })
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "Way2Go Rentals <noreply@way2go.com.au>"
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "WayZo Rentals <noreply@wayzo.com.au>"
 
   const htmlBody = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827">
       <div style="background:#1e40af;padding:24px 32px;border-radius:8px 8px 0 0">
-        <h1 style="color:#fff;margin:0;font-size:22px">Way2Go Vehicle Rentals</h1>
+        <h1 style="color:#fff;margin:0;font-size:22px">WayZo Vehicle Rentals</h1>
         <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px">Rental Agreement &amp; Terms and Conditions</p>
       </div>
       <div style="background:#f9fafb;padding:24px 32px;border:1px solid #e5e7eb;border-top:none">
         <p style="margin:0 0 16px">Dear ${fullName},</p>
         <p style="margin:0 0 16px">
-          Thank you for confirming your rental with Way2Go. Please find attached your
+          Thank you for confirming your rental with WayZo. Please find attached your
           <strong>Rental Agreement (${contract.contractNumber})</strong> including our full Terms and Conditions.
         </p>
         <div style="background:#dbeafe;border-radius:6px;padding:16px;margin-bottom:16px">
@@ -209,7 +209,7 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
         </p>
       </div>
       <div style="background:#f3f4f6;padding:16px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;text-align:center">
-        <p style="margin:0;font-size:11px;color:#9ca3af">Way2Go Vehicle Rentals &bull; This is an automated message</p>
+        <p style="margin:0;font-size:11px;color:#9ca3af">WayZo Vehicle Rentals &bull; This is an automated message</p>
       </div>
     </div>
   `
@@ -218,7 +218,7 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
   const { error } = await resend.emails.send({
     from: fromEmail,
     to: c.email,
-    subject: `Your Rental Agreement — ${booking.bookingNumber} | Way2Go Vehicle Rentals`,
+    subject: `Your Rental Agreement — ${booking.bookingNumber} | WayZo Vehicle Rentals`,
     html: htmlBody,
     attachments: [
       {
@@ -230,7 +230,7 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
 
   if (error) return { error: error.message }
 
-  revalidatePath("/bookings")
-  revalidatePath("/contracts")
+  revalidatePath("/admin/bookings")
+  revalidatePath("/admin/contracts")
   return {}
 }

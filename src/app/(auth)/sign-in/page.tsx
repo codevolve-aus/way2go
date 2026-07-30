@@ -10,9 +10,9 @@ export default function SignInPage() {
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center space-y-1">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg mx-auto mb-2">
-          W2
+          WZ
         </div>
-        <CardTitle className="text-2xl">Way2Go Admin</CardTitle>
+        <CardTitle className="text-2xl">WayZo Admin</CardTitle>
         <CardDescription>
           Sign in to access the vehicle rental administration system.
           Access is restricted — all sign-ins require admin approval.
@@ -23,7 +23,7 @@ export default function SignInPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("google", { redirectTo: "/dashboard" });
+            await signIn("google", { redirectTo: "/admin/dashboard" });
           }}
         >
           <Button type="submit" className="w-full" size="lg">

@@ -12,10 +12,10 @@ export async function createDamageReport(data: {
   insuranceClaim?: boolean
 }) {
   await db.damageReport.create({ data })
-  revalidatePath("/damage")
+  revalidatePath("/admin/damage")
 }
 
 export async function updateDamageStatus(id: string, status: DamageStatus) {
   await db.damageReport.update({ where: { id }, data: { status } })
-  revalidatePath("/damage")
+  revalidatePath("/admin/damage")
 }

@@ -28,7 +28,8 @@ const labels: Record<string, string> = {
 
 export function AdminBreadcrumb() {
   const pathname = usePathname();
-  const segments = pathname.split("/").filter(Boolean);
+  const allSegments = pathname.split("/").filter(Boolean);
+  const segments = allSegments[0] === "admin" ? allSegments.slice(1) : allSegments;
 
   return (
     <Breadcrumb>
@@ -36,7 +37,7 @@ export function AdminBreadcrumb() {
         {segments.map((seg, i) => {
           const isLast = i === segments.length - 1;
           const label = labels[seg] ?? seg;
-          const href = "/" + segments.slice(0, i + 1).join("/");
+          const href = "/admin/" + segments.slice(0, i + 1).join("/");
 
           return (
             <BreadcrumbItem key={href}>

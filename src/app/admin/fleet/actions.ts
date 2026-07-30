@@ -19,7 +19,7 @@ export async function createVehicle(data: {
   notes?: string
 }) {
   await db.vehicle.create({ data: { ...data, status: "AVAILABLE" } })
-  revalidatePath("/fleet")
+  revalidatePath("/admin/fleet")
 }
 
 export async function updateVehicle(
@@ -40,15 +40,15 @@ export async function updateVehicle(
   }
 ) {
   await db.vehicle.update({ where: { id }, data })
-  revalidatePath("/fleet")
+  revalidatePath("/admin/fleet")
 }
 
 export async function updateVehicleStatus(id: string, status: VehicleStatus) {
   await db.vehicle.update({ where: { id }, data: { status } })
-  revalidatePath("/fleet")
+  revalidatePath("/admin/fleet")
 }
 
 export async function deleteVehicle(id: string) {
   await db.vehicle.delete({ where: { id } })
-  revalidatePath("/fleet")
+  revalidatePath("/admin/fleet")
 }

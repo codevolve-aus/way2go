@@ -12,7 +12,7 @@ export async function createRentalRate(data: {
   isDefault?: boolean
 }) {
   await db.rentalRate.create({ data })
-  revalidatePath("/pricing")
+  revalidatePath("/admin/pricing")
 }
 
 export async function updateRentalRate(id: string, data: {
@@ -21,7 +21,7 @@ export async function updateRentalRate(id: string, data: {
   monthlyRate?: number
 }) {
   await db.rentalRate.update({ where: { id }, data })
-  revalidatePath("/pricing")
+  revalidatePath("/admin/pricing")
 }
 
 export async function createDiscountCode(data: {
@@ -39,10 +39,10 @@ export async function createDiscountCode(data: {
       expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
     },
   })
-  revalidatePath("/pricing")
+  revalidatePath("/admin/pricing")
 }
 
 export async function toggleDiscountCode(id: string, isActive: boolean) {
   await db.discountCode.update({ where: { id }, data: { isActive } })
-  revalidatePath("/pricing")
+  revalidatePath("/admin/pricing")
 }
