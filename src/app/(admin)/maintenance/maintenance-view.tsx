@@ -48,7 +48,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 import {
@@ -129,6 +128,53 @@ function fmtDate(d: string) {
 
 function fmtCurrency(n: number) {
   return `$${n.toFixed(2)}`
+}
+
+function MaintenanceCancelButton({ record }: { record: MaintenanceRecord }) {
+  const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={isPending}
+        onClick={() => setTimeout(() => setOpen(true), 0)}
+      >
+        <X className="h-4 w-4 mr-1" />
+        Cancel
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this maintenance record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Maintenance record for {record.vehicle} will be cancelled.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Record</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  try {
+                    await deleteMaintenanceRecord(record.id)
+                    toast.success("Maintenance record cancelled")
+                  } catch {
+                    toast.error("Failed")
+                  }
+                })
+              }
+            >
+              {isPending ? "Cancelling…" : "Yes, Cancel"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
 }
 
 const emptyForm = {
@@ -357,42 +403,7 @@ export function MaintenanceView({
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                             Complete
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger
-                              render={
-                                <Button variant="ghost" size="sm">
-                                  <X className="h-4 w-4 mr-1" />
-                                  Cancel
-                                </Button>
-                              }
-                            />
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel this maintenance record?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Maintenance record for {r.vehicle} will be cancelled.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Keep Record</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() =>
-                                    startTransition(async () => {
-                                      try {
-                                        await deleteMaintenanceRecord(r.id)
-                                        toast.success("Maintenance record cancelled")
-                                      } catch {
-                                        toast.error("Failed")
-                                      }
-                                    })
-                                  }
-                                >
-                                  Yes, Cancel
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <MaintenanceCancelButton record={r} />
                         </div>
                       </TableCell>
                     </TableRow>

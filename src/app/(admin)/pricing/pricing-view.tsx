@@ -47,7 +47,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 import {
@@ -132,6 +131,99 @@ const emptyCodeForm = {
   discountPct: "",
   usageLimit: "",
   expiresAt: "",
+}
+
+function ExtrasDeactivateButton({ extra }: { extra: Extra }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        onClick={() => setTimeout(() => setOpen(true), 0)}
+      >
+        <X className="h-4 w-4" />
+        Deactivate
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate &quot;{extra.name}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This extra will no longer be available for new bookings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                toast.success(`${extra.name} has been deactivated`)
+                setOpen(false)
+              }}
+            >
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
+function DiscountRevokeButton({
+  dc,
+  isPending,
+  startTransition,
+}: {
+  dc: DiscountCode
+  isPending: boolean
+  startTransition: (fn: () => Promise<void>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        onClick={() => setTimeout(() => setOpen(true), 0)}
+      >
+        Revoke
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke &quot;{dc.code}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This discount code will be revoked and can no longer be used.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  try {
+                    await toggleDiscountCode(dc.id, false)
+                    toast.success(`Code ${dc.code} has been revoked`)
+                    setOpen(false)
+                  } catch {
+                    toast.error("Failed to revoke code")
+                  }
+                })
+              }
+            >
+              {isPending ? "Revoking…" : "Revoke"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
 }
 
 interface PricingViewProps {
@@ -353,37 +445,7 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
                             Edit
                           </Button>
                           {extra.isActive && (
-                            <AlertDialog>
-                              <AlertDialogTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  >
-                                    <X className="h-4 w-4" />
-                                    Deactivate
-                                  </Button>
-                                }
-                              />
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Deactivate &quot;{extra.name}&quot;?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This extra will no longer be available for new bookings.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    variant="destructive"
-                                    onClick={() => toast.success(`${extra.name} has been deactivated`)}
-                                  >
-                                    Deactivate
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <ExtrasDeactivateButton extra={extra} />
                           )}
                         </div>
                       </TableCell>
@@ -456,45 +518,11 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
                           </Button>
                           <Separator orientation="vertical" className="h-4 mx-0.5" />
                           {dc.status === "Active" ? (
-                            <AlertDialog>
-                              <AlertDialogTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  >
-                                    Revoke
-                                  </Button>
-                                }
-                              />
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Revoke &quot;{dc.code}&quot;?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This discount code will be revoked and can no longer be used.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    variant="destructive"
-                                    onClick={() =>
-                                      startTransition(async () => {
-                                        try {
-                                          await toggleDiscountCode(dc.id, false)
-                                          toast.success(`Code ${dc.code} has been revoked`)
-                                        } catch {
-                                          toast.error("Failed to revoke code")
-                                        }
-                                      })
-                                    }
-                                  >
-                                    Revoke
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <DiscountRevokeButton
+                              dc={dc}
+                              isPending={isPending}
+                              startTransition={startTransition}
+                            />
                           ) : (
                             <Button
                               variant="ghost"
