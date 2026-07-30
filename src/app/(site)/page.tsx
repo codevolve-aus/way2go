@@ -36,7 +36,10 @@ const valueProps = [
 
 async function getCategories() {
   try {
-    return await db.vehicleCategory.findMany({ orderBy: { name: "asc" } });
+    return await db.vehicleCategory.findMany({
+      where: { vehicles: { some: {} } },
+      orderBy: { name: "asc" },
+    });
   } catch {
     return [];
   }

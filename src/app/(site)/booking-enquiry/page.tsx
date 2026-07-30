@@ -11,7 +11,10 @@ export const metadata: Metadata = {
 async function getFormOptions() {
   try {
     const [categories, locations] = await Promise.all([
-      db.vehicleCategory.findMany({ orderBy: { name: "asc" } }),
+      db.vehicleCategory.findMany({
+        where: { vehicles: { some: {} } },
+        orderBy: { name: "asc" },
+      }),
       db.location.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     ])
     return { categories, locations }
