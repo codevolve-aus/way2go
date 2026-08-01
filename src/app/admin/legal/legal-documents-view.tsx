@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
+import { diffWords } from "diff"
 import { PenLine, History, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 import {
   Sheet,
   SheetContent,
@@ -198,6 +200,135 @@ function EditSheet({
   )
 }
 
+type SectionDiff =
+  | { type: "added"; heading: string; body: string }
+  | { type: "removed"; heading: string; body: string }
+  | { type: "changed"; heading: string; oldHeading: string; oldBody: string; body: string }
+  | { type: "unchanged"; heading: string; body: string }
+
+function diffSections(
+  oldSections: SectionInput[] | undefined,
+  newSections: SectionInput[]
+): SectionDiff[] {
+  const oldPool = [...(oldSections ?? [])]
+  const diffs: SectionDiff[] = []
+
+  for (const section of newSections) {
+    const matchIndex = oldPool.findIndex((s) => s.heading === section.heading)
+    if (matchIndex === -1) {
+      diffs.push({ type: "added", heading: section.heading, body: section.body })
+    } else {
+      const [old] = oldPool.splice(matchIndex, 1)
+      if (old.body === section.body) {
+        diffs.push({ type: "unchanged", heading: section.heading, body: section.body })
+      } else {
+        diffs.push({
+          type: "changed",
+          heading: section.heading,
+          oldHeading: old.heading,
+          oldBody: old.body,
+          body: section.body,
+        })
+      }
+    }
+  }
+
+  for (const leftover of oldPool) {
+    diffs.push({ type: "removed", heading: leftover.heading, body: leftover.body })
+  }
+
+  return diffs
+}
+
+function DiffBadge({ type }: { type: SectionDiff["type"] }) {
+  switch (type) {
+    case "added":
+      return <Badge className="bg-green-500/15 text-green-600 dark:text-green-400 border-0">Added</Badge>
+    case "removed":
+      return <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-0">Removed</Badge>
+    case "changed":
+      return <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0">Changed</Badge>
+    case "unchanged":
+      return null
+  }
+}
+
+function WordDiff({ oldText, newText }: { oldText: string; newText: string }) {
+  const parts = diffWords(oldText, newText)
+  return (
+    <p className="text-xs whitespace-pre-line leading-relaxed">
+      {parts.map((part, i) => {
+        if (part.added) {
+          return (
+            <span key={i} className="bg-green-500/20 text-green-700 dark:text-green-400">
+              {part.value}
+            </span>
+          )
+        }
+        if (part.removed) {
+          return (
+            <span
+              key={i}
+              className="bg-red-500/20 text-red-700 dark:text-red-400 line-through"
+            >
+              {part.value}
+            </span>
+          )
+        }
+        return (
+          <span key={i} className="text-muted-foreground">
+            {part.value}
+          </span>
+        )
+      })}
+    </p>
+  )
+}
+
+function RevisionDiff({ diffs }: { diffs: SectionDiff[] }) {
+  const changed = diffs.filter((d) => d.type !== "unchanged")
+  const unchanged = diffs.filter((d) => d.type === "unchanged")
+
+  if (changed.length === 0) {
+    return <p className="text-xs text-muted-foreground">No content changes.</p>
+  }
+
+  return (
+    <div className="space-y-3">
+      {changed.map((d, i) => (
+        <div key={i} className="rounded-md border border-border p-2.5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <DiffBadge type={d.type} />
+            <p className="text-xs font-semibold">
+              {d.type === "changed" && d.oldHeading !== d.heading
+                ? `${d.oldHeading} → ${d.heading}`
+                : d.heading}
+            </p>
+          </div>
+          {d.type === "changed" ? (
+            <WordDiff oldText={d.oldBody} newText={d.body} />
+          ) : (
+            <p
+              className={
+                d.type === "removed"
+                  ? "text-xs text-red-600 dark:text-red-400 line-through whitespace-pre-line"
+                  : "text-xs text-green-700 dark:text-green-400 whitespace-pre-line"
+              }
+            >
+              {d.body}
+            </p>
+          )}
+        </div>
+      ))}
+      {unchanged.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {unchanged.length} other section{unchanged.length === 1 ? "" : "s"} unchanged.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function HistorySheet({
   doc,
   open,
@@ -219,9 +350,13 @@ function HistorySheet({
           {doc.revisions.length === 0 && (
             <p className="text-sm text-muted-foreground">No changes recorded yet.</p>
           )}
-          {doc.revisions.map((rev) => {
+          {doc.revisions.map((rev, i) => {
             const snapshot = rev.snapshot as { title: string; sections: SectionInput[] } | null
+            const previousSnapshot = doc.revisions[i + 1]?.snapshot as
+              | { title: string; sections: SectionInput[] }
+              | undefined
             const isExpanded = expandedId === rev.id
+            const isInitial = i === doc.revisions.length - 1
             return (
               <div key={rev.id} className="rounded-lg border border-border p-3">
                 <button
@@ -230,7 +365,14 @@ function HistorySheet({
                   onClick={() => setExpandedId(isExpanded ? null : rev.id)}
                 >
                   <div>
-                    <p className="text-sm font-medium">{rev.editedBy ?? "Unknown"}</p>
+                    <p className="text-sm font-medium">
+                      {rev.editedBy ?? "Unknown"}
+                      {isInitial && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          (initial version)
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">{formatDateTime(rev.editedAt)}</p>
                   </div>
                   {isExpanded ? (
@@ -240,15 +382,21 @@ function HistorySheet({
                   )}
                 </button>
                 {isExpanded && snapshot && (
-                  <div className="mt-3 space-y-3 border-t border-border pt-3">
-                    {snapshot.sections.map((s, i) => (
-                      <div key={i}>
-                        <p className="text-xs font-semibold">{s.heading}</p>
-                        <p className="text-xs text-muted-foreground whitespace-pre-line mt-0.5">
-                          {s.body}
-                        </p>
+                  <div className="mt-3 border-t border-border pt-3">
+                    {isInitial ? (
+                      <div className="space-y-3">
+                        {snapshot.sections.map((s, si) => (
+                          <div key={si}>
+                            <p className="text-xs font-semibold">{s.heading}</p>
+                            <p className="text-xs text-muted-foreground whitespace-pre-line mt-0.5">
+                              {s.body}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <RevisionDiff diffs={diffSections(previousSnapshot?.sections, snapshot.sections)} />
+                    )}
                   </div>
                 )}
               </div>
