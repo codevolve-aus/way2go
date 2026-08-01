@@ -4,8 +4,10 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "WayZo Vehicle Rentals",
     short_name: "WayZo",
-    description: "Vehicle rental administration system",
-    start_url: "/admin/dashboard",
+    description:
+      "WayZo Vehicle Rentals — reliable vehicle hire across Sydney. Browse our fleet and send a booking enquiry.",
+    start_url: "/",
+    scope: "/",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#2563eb",
