@@ -451,3 +451,33 @@ model Setting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// ─── Legal Documents ─────────────────────────────────────────────────────────
+
+model LegalDocument {
+  id        String                   @id @default(cuid())
+  slug      String                   @unique
+  title     String
+  updatedAt DateTime                 @updatedAt
+  updatedBy String?
+  sections  LegalDocumentSection[]
+  revisions LegalDocumentRevision[]
+}
+
+model LegalDocumentSection {
+  id         String        @id @default(cuid())
+  documentId String
+  document   LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  order      Int
+  heading    String
+  body       String        @db.Text
+}
+
+model LegalDocumentRevision {
+  id         String        @id @default(cuid())
+  documentId String
+  document   LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  snapshot   Json
+  editedBy   String?
+  editedAt   DateTime      @default(now())
+}

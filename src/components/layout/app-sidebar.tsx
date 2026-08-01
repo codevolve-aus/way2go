@@ -15,6 +15,7 @@ import {
   Wrench,
   BarChart3,
   Settings,
+  Scale,
 } from "lucide-react";
 import {
   Sidebar,
@@ -114,6 +115,16 @@ function NavItems() {
 
       <SidebarFooter className="border-t border-sidebar-border space-y-1 pb-2">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              render={<Link href="/admin/legal" onClick={handleNavClick} />}
+              isActive={pathname.startsWith("/admin/legal")}
+              tooltip="Legal Pages"
+            >
+              <Scale className="h-4 w-4" />
+              <span>Legal Pages</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               render={<Link href="/admin/settings" onClick={handleNavClick} />}
