@@ -1,8 +1,23 @@
+import type { Metadata } from "next";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AdminBreadcrumb } from "@/components/layout/admin-breadcrumb";
 import { auth } from "@/auth";
+
+export const metadata: Metadata = {
+  title: { default: "WayZo Admin", template: "%s | WayZo Admin" },
+  manifest: "/admin/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "WayZo Admin",
+  },
+  icons: {
+    icon: [{ url: "/icons/icon-admin.svg" }],
+    apple: [{ url: "/icons/icon-admin.svg" }],
+  },
+};
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
