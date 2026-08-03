@@ -69,6 +69,7 @@ export async function submitBookingEnquiry(data: {
   pickupLocation: string
   pickupDate: string
   returnDate: string
+  discountCode?: string
   notes: string
 }) {
   if (!data.name.trim() || !data.email.trim() || !data.phone.trim()) {
@@ -92,6 +93,7 @@ export async function submitBookingEnquiry(data: {
       { label: "Pickup Location", value: data.pickupLocation },
       { label: "Pickup Date", value: data.pickupDate },
       { label: "Return Date", value: data.returnDate },
+      { label: "Promo Code", value: data.discountCode ?? "" },
       { label: "Notes", value: data.notes },
     ]),
   })

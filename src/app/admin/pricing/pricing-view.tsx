@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { PenLine, Tag, Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -55,6 +55,8 @@ import {
   createDiscountCode,
   toggleDiscountCode,
 } from "./actions"
+import { updatePricingRules, getPriceEstimate, type PriceEstimateResult } from "@/lib/pricing-actions"
+import type { PricingRules } from "@/lib/pricing"
 
 type CategoryOption = { id: string; name: string }
 
@@ -66,6 +68,9 @@ interface RateCard {
   dailyRate: number
   weeklyRate: number
   monthlyRate: number
+  isDefault: boolean
+  startDate: string
+  endDate: string
 }
 
 interface Extra {
@@ -124,7 +129,20 @@ const emptyRateForm = {
   dailyRate: "",
   weeklyRate: "",
   monthlyRate: "",
+  isDefault: false,
+  startDate: "",
+  endDate: "",
 }
+
+const weekdayLabels = [
+  { value: 0, label: "Sun" },
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+]
 
 const emptyCodeForm = {
   code: "",
@@ -226,14 +244,140 @@ function DiscountRevokeButton({
   )
 }
 
+function PricingPreview({ categories }: { categories: CategoryOption[] }) {
+  const [categoryId, setCategoryId] = useState("")
+  const [pickupDate, setPickupDate] = useState("")
+  const [returnDate, setReturnDate] = useState("")
+  const [discountCode, setDiscountCode] = useState("")
+  const [result, setResult] = useState<PriceEstimateResult | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const canEstimate = Boolean(categoryId && pickupDate && returnDate)
+
+  useEffect(() => {
+    if (!canEstimate) return
+    const handle = setTimeout(() => {
+      startTransition(async () => {
+        const r = await getPriceEstimate({
+          categoryId,
+          pickupDate,
+          returnDate,
+          discountCode: discountCode || undefined,
+        })
+        setResult(r)
+      })
+    }, 350)
+    return () => clearTimeout(handle)
+  }, [canEstimate, categoryId, pickupDate, returnDate, discountCode])
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border pb-4">
+        <CardTitle className="text-base font-medium">Live Preview</CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Test how a rate card and the rules above combine for a sample trip.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="space-y-1.5">
+          <Label>Category</Label>
+          <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? "")}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Pickup</Label>
+            <Input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Return</Label>
+            <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Promo Code (optional)</Label>
+          <Input
+            value={discountCode}
+            onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+            placeholder="SUMMER20"
+          />
+        </div>
+
+        {canEstimate && isPending && <p className="text-sm text-muted-foreground">Calculating…</p>}
+
+        {canEstimate && !isPending && result && result.ok && (
+          <div className="rounded-lg border border-border p-4 text-sm space-y-1.5">
+            <div className="flex justify-between text-muted-foreground">
+              <span>Rate card</span>
+              <span>{result.rateName}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>
+                {result.breakdown.nights} night{result.breakdown.nights === 1 ? "" : "s"} ·{" "}
+                {result.breakdown.baseRateType}
+              </span>
+              <span>{formatCurrency(result.breakdown.baseSubtotal)}</span>
+            </div>
+            {result.breakdown.weekendSurcharge > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Weekend surcharge ({result.breakdown.weekendNights} night(s))</span>
+                <span>+{formatCurrency(result.breakdown.weekendSurcharge)}</span>
+              </div>
+            )}
+            {result.discountApplied && (
+              <div className="flex justify-between text-green-600 dark:text-green-400">
+                <span>Discount</span>
+                <span>-{formatCurrency(result.breakdown.discountAmount)}</span>
+              </div>
+            )}
+            {result.discountError && <p className="text-xs text-destructive">{result.discountError}</p>}
+            <div className="flex justify-between text-muted-foreground">
+              <span>Service fee</span>
+              <span>{formatCurrency(result.breakdown.serviceFee)}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Tax</span>
+              <span>{formatCurrency(result.breakdown.taxAmount)}</span>
+            </div>
+            <Separator className="my-1" />
+            <div className="flex justify-between font-semibold text-foreground text-base">
+              <span>Total</span>
+              <span>{formatCurrency(result.breakdown.total)}</span>
+            </div>
+            {result.breakdown.belowMinimum && (
+              <p className="text-xs text-destructive pt-1">
+                Below the configured minimum rental length.
+              </p>
+            )}
+          </div>
+        )}
+
+        {canEstimate && !isPending && result && !result.ok && (
+          <p className="text-sm text-destructive">{result.error}</p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 interface PricingViewProps {
   rateCards: RateCard[]
   extras: Extra[]
   discountCodes: DiscountCode[]
   categories: CategoryOption[]
+  pricingRules: PricingRules
 }
 
-export function PricingView({ rateCards, extras, discountCodes, categories }: PricingViewProps) {
+export function PricingView({ rateCards, extras, discountCodes, categories, pricingRules }: PricingViewProps) {
   const [rateOpen, setRateOpen] = useState(false)
   const [editingRateId, setEditingRateId] = useState<string | null>(null)
   const [rateForm, setRateForm] = useState(emptyRateForm)
@@ -255,6 +399,9 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
       dailyRate: String(rc.dailyRate),
       weeklyRate: rc.weeklyRate ? String(rc.weeklyRate) : "",
       monthlyRate: rc.monthlyRate ? String(rc.monthlyRate) : "",
+      isDefault: rc.isDefault,
+      startDate: rc.startDate,
+      endDate: rc.endDate,
     })
     setRateOpen(true)
   }
@@ -271,7 +418,14 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
     startTransition(async () => {
       try {
         if (editingRateId) {
-          await updateRentalRate(editingRateId, { dailyRate, weeklyRate, monthlyRate })
+          await updateRentalRate(editingRateId, {
+            dailyRate,
+            weeklyRate,
+            monthlyRate,
+            isDefault: rateForm.isDefault,
+            startDate: rateForm.startDate || undefined,
+            endDate: rateForm.endDate || undefined,
+          })
           toast.success("Rate card updated successfully")
         } else {
           if (!rateForm.categoryId) {
@@ -284,6 +438,9 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
             dailyRate,
             weeklyRate,
             monthlyRate,
+            isDefault: rateForm.isDefault,
+            startDate: rateForm.startDate || undefined,
+            endDate: rateForm.endDate || undefined,
           })
           toast.success("Rate card added successfully")
         }
@@ -291,6 +448,30 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
         setRateForm(emptyRateForm)
       } catch {
         toast.error(editingRateId ? "Failed to update rate card" : "Failed to add rate card")
+      }
+    })
+  }
+
+  const [rulesForm, setRulesForm] = useState(pricingRules)
+  const [isSavingRules, startRulesTransition] = useTransition()
+
+  function toggleWeekendDay(day: number) {
+    setRulesForm((f) => ({
+      ...f,
+      weekendDays: f.weekendDays.includes(day)
+        ? f.weekendDays.filter((d) => d !== day)
+        : [...f.weekendDays, day].sort(),
+    }))
+  }
+
+  function handleRulesSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    startRulesTransition(async () => {
+      try {
+        await updatePricingRules(rulesForm)
+        toast.success("Pricing rules updated")
+      } catch {
+        toast.error("Failed to update pricing rules")
       }
     })
   }
@@ -340,6 +521,7 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
           <TabsTrigger value="rate-cards">Rate Cards</TabsTrigger>
           <TabsTrigger value="extras">Extras</TabsTrigger>
           <TabsTrigger value="discount-codes">Discount Codes</TabsTrigger>
+          <TabsTrigger value="rules">Pricing Rules</TabsTrigger>
         </TabsList>
 
         {/* ---- Rate Cards Tab ---- */}
@@ -364,7 +546,17 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
                   {rateCards.map((rc) => (
                     <TableRow key={rc.id}>
                       <TableCell className="pl-4 font-medium text-foreground">{rc.category}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{rc.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {rc.name}
+                        {rc.isDefault && (
+                          <Badge variant="secondary" className="ml-2 align-middle">Default</Badge>
+                        )}
+                        {(rc.startDate || rc.endDate) && (
+                          <span className="block text-xs text-muted-foreground mt-0.5">
+                            {formatDate(rc.startDate)} – {formatDate(rc.endDate)}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(rc.dailyRate)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(rc.weeklyRate)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(rc.monthlyRate)}</TableCell>
@@ -542,6 +734,106 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ---- Pricing Rules Tab ---- */}
+        <TabsContent value="rules" className="mt-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="border-b border-border pb-4">
+                <CardTitle className="text-base font-medium">Global Pricing Rules</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Applied on top of every rate card when estimating a price.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleRulesSubmit} className="flex flex-col gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Weekend Surcharge (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={rulesForm.weekendSurchargePct}
+                        onChange={(e) =>
+                          setRulesForm((f) => ({ ...f, weekendSurchargePct: parseFloat(e.target.value) || 0 }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Minimum Rental (days)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={rulesForm.minRentalDays}
+                        onChange={(e) =>
+                          setRulesForm((f) => ({ ...f, minRentalDays: parseInt(e.target.value, 10) || 0 }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Service Fee (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={rulesForm.serviceFeePct}
+                        onChange={(e) =>
+                          setRulesForm((f) => ({ ...f, serviceFeePct: parseFloat(e.target.value) || 0 }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Tax Rate (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={rulesForm.taxRatePct}
+                        onChange={(e) =>
+                          setRulesForm((f) => ({ ...f, taxRatePct: parseFloat(e.target.value) || 0 }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Weekend Nights</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Nights on these days carry the weekend surcharge above.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {weekdayLabels.map((d) => {
+                        const active = rulesForm.weekendDays.includes(d.value)
+                        return (
+                          <button
+                            key={d.value}
+                            type="button"
+                            onClick={() => toggleWeekendDay(d.value)}
+                            className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors ${
+                              active
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-transparent text-muted-foreground border-input hover:bg-muted"
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="submit" disabled={isSavingRules}>
+                      {isSavingRules ? "Saving…" : "Save Rules"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <PricingPreview categories={categories} />
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Add / Edit Rate Card Sheet */}
@@ -616,6 +908,37 @@ export function PricingView({ rateCards, extras, discountCodes, categories }: Pr
                 placeholder="1800.00"
               />
             </div>
+            <Separator />
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                Seasonal Window (optional)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Leave blank for a year-round rate. If set, this rate applies only to bookings
+                that pick up within this window and takes priority over the default rate.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  type="date"
+                  value={rateForm.startDate}
+                  onChange={(e) => setRateForm((f) => ({ ...f, startDate: e.target.value }))}
+                />
+                <Input
+                  type="date"
+                  value={rateForm.endDate}
+                  onChange={(e) => setRateForm((f) => ({ ...f, endDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={rateForm.isDefault}
+                onChange={(e) => setRateForm((f) => ({ ...f, isDefault: e.target.checked }))}
+              />
+              Default rate for this category
+            </label>
             <SheetFooter className="px-0">
               <Button type="button" variant="outline" onClick={() => setRateOpen(false)}>
                 Cancel

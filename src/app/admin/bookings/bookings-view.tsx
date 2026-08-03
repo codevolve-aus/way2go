@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import {
   Search,
   Plus,
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -80,10 +81,60 @@ import {
 } from "@/components/ui/alert-dialog"
 
 import { createBooking, updateBooking, updateBookingStatus, sendContractEmail } from "./actions"
+import { getPriceEstimate, type PriceEstimateResult } from "@/lib/pricing-actions"
 
 type BookingRow = Booking & { customer: Customer; vehicle: Vehicle }
 type CustomerOption = Pick<Customer, "id" | "firstName" | "lastName">
-type VehicleOption = Pick<Vehicle, "id" | "make" | "model" | "registrationNo">
+type VehicleOption = Pick<Vehicle, "id" | "make" | "model" | "registrationNo" | "categoryId">
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    minimumFractionDigits: 0,
+  }).format(amount)
+}
+
+function BookingPriceEstimate({ result, isPending }: { result: PriceEstimateResult | null; isPending: boolean }) {
+  if (isPending) return <p className="text-sm text-muted-foreground">Calculating price…</p>
+  if (!result) return null
+  if (!result.ok) return <p className="text-sm text-muted-foreground">{result.error}</p>
+
+  const { breakdown, rateName } = result
+  return (
+    <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm space-y-1.5">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Estimated Price — {rateName}
+      </p>
+      <div className="flex justify-between text-muted-foreground">
+        <span>{breakdown.nights} night{breakdown.nights === 1 ? "" : "s"}</span>
+        <span>{formatCurrency(breakdown.baseSubtotal)}</span>
+      </div>
+      {breakdown.weekendSurcharge > 0 && (
+        <div className="flex justify-between text-muted-foreground">
+          <span>Weekend surcharge</span>
+          <span>+{formatCurrency(breakdown.weekendSurcharge)}</span>
+        </div>
+      )}
+      <div className="flex justify-between text-muted-foreground">
+        <span>Service fee</span>
+        <span>{formatCurrency(breakdown.serviceFee)}</span>
+      </div>
+      <div className="flex justify-between text-muted-foreground">
+        <span>Tax</span>
+        <span>{formatCurrency(breakdown.taxAmount)}</span>
+      </div>
+      <Separator className="my-1" />
+      <div className="flex justify-between text-base font-semibold text-foreground">
+        <span>Estimated Total</span>
+        <span>{formatCurrency(breakdown.total)}</span>
+      </div>
+      {breakdown.belowMinimum && (
+        <p className="text-xs text-destructive pt-1">Below the configured minimum rental length.</p>
+      )}
+    </div>
+  )
+}
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   PENDING: "Pending",
@@ -393,6 +444,25 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [isPending, startTransition] = useTransition()
+  const [estimate, setEstimate] = useState<PriceEstimateResult | null>(null)
+  const [isEstimating, startEstimateTransition] = useTransition()
+  const selectedVehicle = vehicles.find((v) => v.id === form.vehicleId)
+  const canEstimate = Boolean(selectedVehicle && form.pickupDate && form.returnDate)
+
+  useEffect(() => {
+    if (!canEstimate || !selectedVehicle) return
+    const handle = setTimeout(() => {
+      startEstimateTransition(async () => {
+        const result = await getPriceEstimate({
+          categoryId: selectedVehicle.categoryId,
+          pickupDate: form.pickupDate,
+          returnDate: form.returnDate,
+        })
+        setEstimate(result)
+      })
+    }, 350)
+    return () => clearTimeout(handle)
+  }, [canEstimate, selectedVehicle, form.pickupDate, form.returnDate])
 
   const today = new Date().toDateString()
   const pendingCount = bookings.filter((b) => b.status === "PENDING").length
@@ -720,6 +790,7 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
               }
               required
             />
+            {canEstimate && <BookingPriceEstimate result={estimate} isPending={isEstimating} />}
             <div className="space-y-1.5">
               <Label>Pickup Location</Label>
               <Input

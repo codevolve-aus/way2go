@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -14,16 +16,86 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { submitBookingEnquiry } from "../actions"
+import { getPriceEstimate, type PriceEstimateResult } from "@/lib/pricing-actions"
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    minimumFractionDigits: 0,
+  }).format(amount)
+}
 
 const emptyForm = {
   name: "",
   email: "",
   phone: "",
-  vehicleCategory: "",
+  categoryId: "",
   pickupLocation: "",
   pickupDate: "",
   returnDate: "",
+  discountCode: "",
   notes: "",
+}
+
+function PriceEstimateCard({ result, isPending }: { result: PriceEstimateResult | null; isPending: boolean }) {
+  if (isPending) {
+    return <p className="text-sm text-muted-foreground">Calculating your estimate…</p>
+  }
+  if (!result) return null
+  if (!result.ok) {
+    return <p className="text-sm text-muted-foreground">{result.error}</p>
+  }
+  const { breakdown, rateName } = result
+  return (
+    <Card className="bg-muted/40">
+      <CardContent className="pt-6 text-sm space-y-1.5">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+          Estimated Price — {rateName}
+        </p>
+        <div className="flex justify-between text-muted-foreground">
+          <span>
+            {breakdown.nights} night{breakdown.nights === 1 ? "" : "s"}
+          </span>
+          <span>{formatCurrency(breakdown.baseSubtotal)}</span>
+        </div>
+        {breakdown.weekendSurcharge > 0 && (
+          <div className="flex justify-between text-muted-foreground">
+            <span>Weekend surcharge</span>
+            <span>+{formatCurrency(breakdown.weekendSurcharge)}</span>
+          </div>
+        )}
+        {result.discountApplied && (
+          <div className="flex justify-between text-green-600 dark:text-green-400">
+            <span>Promo discount</span>
+            <span>-{formatCurrency(breakdown.discountAmount)}</span>
+          </div>
+        )}
+        {result.discountError && <p className="text-xs text-destructive">{result.discountError}</p>}
+        <div className="flex justify-between text-muted-foreground">
+          <span>Service fee</span>
+          <span>{formatCurrency(breakdown.serviceFee)}</span>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <span>Tax</span>
+          <span>{formatCurrency(breakdown.taxAmount)}</span>
+        </div>
+        <Separator className="my-1" />
+        <div className="flex justify-between text-base font-semibold text-foreground">
+          <span>Estimated Total</span>
+          <span>{formatCurrency(breakdown.total)}</span>
+        </div>
+        {breakdown.belowMinimum && (
+          <p className="text-xs text-destructive pt-1">
+            This is shorter than our minimum rental length — we&apos;ll confirm options when we get in touch.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground pt-1">
+          Estimate only — final pricing is confirmed by our team.
+        </p>
+      </CardContent>
+    </Card>
+  )
 }
 
 export function BookingEnquiryForm({
@@ -35,17 +107,48 @@ export function BookingEnquiryForm({
 }) {
   const [form, setForm] = useState(emptyForm)
   const [isPending, startTransition] = useTransition()
+  const [estimate, setEstimate] = useState<PriceEstimateResult | null>(null)
+  const [isEstimating, startEstimateTransition] = useTransition()
+  const canEstimate = Boolean(form.categoryId && form.pickupDate && form.returnDate)
+
+  useEffect(() => {
+    if (!canEstimate) return
+    const handle = setTimeout(() => {
+      startEstimateTransition(async () => {
+        const result = await getPriceEstimate({
+          categoryId: form.categoryId,
+          pickupDate: form.pickupDate,
+          returnDate: form.returnDate,
+          discountCode: form.discountCode || undefined,
+        })
+        setEstimate(result)
+      })
+    }, 350)
+    return () => clearTimeout(handle)
+  }, [canEstimate, form.categoryId, form.pickupDate, form.returnDate, form.discountCode])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
-      const { error } = await submitBookingEnquiry(form)
+      const categoryName = categories.find((c) => c.id === form.categoryId)?.name ?? ""
+      const { error } = await submitBookingEnquiry({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        vehicleCategory: categoryName,
+        pickupLocation: form.pickupLocation,
+        pickupDate: form.pickupDate,
+        returnDate: form.returnDate,
+        discountCode: form.discountCode,
+        notes: form.notes,
+      })
       if (error) {
         toast.error(error)
         return
       }
       toast.success("Thanks — we've received your enquiry and will confirm availability soon.")
       setForm(emptyForm)
+      setEstimate(null)
     })
   }
 
@@ -88,15 +191,15 @@ export function BookingEnquiryForm({
         <div className="space-y-1.5">
           <Label htmlFor="enquiry-category">Preferred Vehicle</Label>
           <Select
-            value={form.vehicleCategory}
-            onValueChange={(v) => setForm({ ...form, vehicleCategory: v ?? "" })}
+            value={form.categoryId}
+            onValueChange={(v) => setForm({ ...form, categoryId: v ?? "" })}
           >
             <SelectTrigger id="enquiry-category" className="w-full">
               <SelectValue placeholder="Any category" />
             </SelectTrigger>
             <SelectContent>
               {categories.map((c) => (
-                <SelectItem key={c.id} value={c.name}>
+                <SelectItem key={c.id} value={c.id}>
                   {c.name}
                 </SelectItem>
               ))}
@@ -145,6 +248,18 @@ export function BookingEnquiryForm({
           />
         </div>
       </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="enquiry-discount">Promo Code (optional)</Label>
+        <Input
+          id="enquiry-discount"
+          value={form.discountCode}
+          onChange={(e) => setForm({ ...form, discountCode: e.target.value.toUpperCase() })}
+          placeholder="SUMMER20"
+        />
+      </div>
+
+      {canEstimate && <PriceEstimateCard result={estimate} isPending={isEstimating} />}
 
       <div className="space-y-1.5">
         <Label htmlFor="enquiry-notes">Notes (optional)</Label>

@@ -1,17 +1,19 @@
 import { Metadata } from "next"
 import { db } from "@/lib/db"
+import { getPricingRules } from "@/lib/pricing-actions"
 import { PricingView } from "./pricing-view"
 
 export const metadata: Metadata = { title: "Pricing" }
 
 export default async function PricingPage() {
-  const [rates, rawCodes, categories] = await Promise.all([
+  const [rates, rawCodes, categories, pricingRules] = await Promise.all([
     db.rentalRate.findMany({
       include: { category: true },
       orderBy: { createdAt: "desc" },
     }),
     db.discountCode.findMany({ orderBy: { createdAt: "desc" } }),
     db.vehicleCategory.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    getPricingRules(),
   ])
 
   const now = new Date()
@@ -24,6 +26,9 @@ export default async function PricingPage() {
     dailyRate: r.dailyRate,
     weeklyRate: r.weeklyRate ?? 0,
     monthlyRate: r.monthlyRate ?? 0,
+    isDefault: r.isDefault,
+    startDate: r.startDate ? r.startDate.toISOString().slice(0, 10) : "",
+    endDate: r.endDate ? r.endDate.toISOString().slice(0, 10) : "",
   }))
 
   const discountCodes = rawCodes.map((c) => {
@@ -51,6 +56,7 @@ export default async function PricingPage() {
       extras={[]}
       discountCodes={discountCodes}
       categories={categories}
+      pricingRules={pricingRules}
     />
   )
 }
