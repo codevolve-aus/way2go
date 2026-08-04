@@ -3,6 +3,8 @@
 import { Resend } from "resend"
 import { db } from "@/lib/db"
 import { isValidAustralianPhone } from "@/lib/phone"
+import { getPriceEstimate } from "@/lib/pricing-actions"
+import type { PriceBreakdown } from "@/lib/pricing"
 
 const fromEmail = process.env.RESEND_FROM_EMAIL ?? "WayZo Rentals <noreply@wayzo.com.au>"
 // Customer-facing enquiries go to CONTACT_EMAIL; ADMIN_EMAIL is reserved for
@@ -43,12 +45,78 @@ function formatEnquiryDate(d: string) {
   })
 }
 
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    minimumFractionDigits: 0,
+  }).format(amount)
+}
+
+// Flat label/value rows for the admin notification table.
+function priceEstimateRows(breakdown: PriceBreakdown, discountApplied: boolean) {
+  const rows: { label: string; value: string }[] = [
+    {
+      label: `Estimate (${breakdown.nights} night${breakdown.nights === 1 ? "" : "s"}, ${breakdown.baseRateType})`,
+      value: formatCurrency(breakdown.baseSubtotal),
+    },
+  ]
+  if (breakdown.weekendSurcharge > 0) {
+    rows.push({ label: "Weekend surcharge", value: `+${formatCurrency(breakdown.weekendSurcharge)}` })
+  }
+  if (discountApplied && breakdown.discountAmount > 0) {
+    rows.push({ label: "Promo discount", value: `-${formatCurrency(breakdown.discountAmount)}` })
+  }
+  rows.push({ label: "Service fee", value: formatCurrency(breakdown.serviceFee) })
+  rows.push({ label: "Tax", value: formatCurrency(breakdown.taxAmount) })
+  rows.push({ label: "Estimated Total", value: formatCurrency(breakdown.total) })
+  return rows
+}
+
+// Its own visually distinct box for the customer-facing email.
+function priceEstimateBox(breakdown: PriceBreakdown, discountApplied: boolean) {
+  const lines: { label: string; value: string; bold?: boolean }[] = [
+    {
+      label: `${breakdown.nights} night${breakdown.nights === 1 ? "" : "s"}`,
+      value: formatCurrency(breakdown.baseSubtotal),
+    },
+  ]
+  if (breakdown.weekendSurcharge > 0) {
+    lines.push({ label: "Weekend surcharge", value: `+${formatCurrency(breakdown.weekendSurcharge)}` })
+  }
+  if (discountApplied && breakdown.discountAmount > 0) {
+    lines.push({ label: "Promo discount", value: `-${formatCurrency(breakdown.discountAmount)}` })
+  }
+  lines.push({ label: "Service fee", value: formatCurrency(breakdown.serviceFee) })
+  lines.push({ label: "Tax", value: formatCurrency(breakdown.taxAmount) })
+  lines.push({ label: "Estimated Total", value: formatCurrency(breakdown.total), bold: true })
+
+  return `
+    <div style="background:#dbeafe;border-radius:6px;padding:16px;margin-bottom:16px">
+      <p style="margin:0 0 8px;font-weight:bold;color:#1e40af">Estimated Price</p>
+      <table style="width:100%;font-size:13px;border-collapse:collapse">
+        ${lines
+          .map(
+            (l) => `
+          <tr>
+            <td style="padding:3px 0;${l.bold ? "font-weight:bold;border-top:1px solid #bfdbfe;padding-top:8px" : "color:#6b7280"}">${l.label}</td>
+            <td style="text-align:right;${l.bold ? "font-weight:bold;font-size:14px;border-top:1px solid #bfdbfe;padding-top:8px" : ""}">${l.value}</td>
+          </tr>`
+          )
+          .join("")}
+      </table>
+      <p style="margin:8px 0 0;font-size:11px;color:#1e3a8a">Estimate only — final pricing is confirmed by our team.</p>
+    </div>
+  `
+}
+
 function customerAckEmail(data: {
   name: string
   vehicleCategory: string
   pickupLocation: string
   pickupDate: string
   returnDate: string
+  priceEstimate?: { breakdown: PriceBreakdown; discountApplied: boolean } | null
 }) {
   const rows: [string, string][] = [
     ["Preferred Vehicle", data.vehicleCategory],
@@ -84,6 +152,11 @@ function customerAckEmail(data: {
               .join("")}
           </table>
         </div>
+        ${
+          data.priceEstimate
+            ? priceEstimateBox(data.priceEstimate.breakdown, data.priceEstimate.discountApplied)
+            : ""
+        }
         <p style="font-size:13px;color:#6b7280;margin:0">
           If anything above isn&apos;t right, just reply to this email and let us know.
         </p>
@@ -150,6 +223,7 @@ export async function submitBookingEnquiry(data: {
   lastName: string
   email: string
   phone: string
+  categoryId?: string
   vehicleCategory: string
   pickupLocation: string
   pickupDate: string
@@ -175,6 +249,26 @@ export async function submitBookingEnquiry(data: {
     // Don't block the enquiry email if the customer record can't be synced
   }
 
+  // Recomputed server-side (not trusted from the client) using the same
+  // engine behind the on-site live estimate, so the email always reflects
+  // current rate cards and pricing rules.
+  let priceEstimate: { breakdown: PriceBreakdown; discountApplied: boolean } | null = null
+  if (data.categoryId && data.pickupDate && data.returnDate) {
+    try {
+      const result = await getPriceEstimate({
+        categoryId: data.categoryId,
+        pickupDate: data.pickupDate,
+        returnDate: data.returnDate,
+        discountCode: data.discountCode,
+      })
+      if (result.ok) {
+        priceEstimate = { breakdown: result.breakdown, discountApplied: result.discountApplied }
+      }
+    } catch {
+      priceEstimate = null
+    }
+  }
+
   const resend = new Resend(process.env.RESEND_API_KEY)
   const { error } = await resend.emails.send({
     from: fromEmail,
@@ -191,6 +285,7 @@ export async function submitBookingEnquiry(data: {
       { label: "Return Date", value: data.returnDate },
       { label: "Promo Code", value: data.discountCode ?? "" },
       { label: "Notes", value: data.notes },
+      ...(priceEstimate ? priceEstimateRows(priceEstimate.breakdown, priceEstimate.discountApplied) : []),
     ]),
   })
 
@@ -202,7 +297,7 @@ export async function submitBookingEnquiry(data: {
       to: data.email,
       replyTo: toEmail,
       subject: "We've received your booking enquiry — WayZo Vehicle Rentals",
-      html: customerAckEmail({ ...data, name: data.firstName.trim() }),
+      html: customerAckEmail({ ...data, name: data.firstName.trim(), priceEstimate }),
     })
   } catch {
     // Don't fail the submission if the customer acknowledgement email doesn't send

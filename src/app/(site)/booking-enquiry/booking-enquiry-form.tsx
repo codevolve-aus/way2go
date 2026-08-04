@@ -146,6 +146,7 @@ export function BookingEnquiryForm({
         lastName: form.lastName,
         email: form.email,
         phone: form.phone,
+        categoryId: form.categoryId,
         vehicleCategory: categoryName,
         pickupLocation: form.pickupLocation,
         pickupDate: form.pickupDate,
