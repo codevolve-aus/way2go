@@ -9,17 +9,21 @@ export const metadata: Metadata = {
 
 async function getFormOptions() {
   try {
-    const [vehicles, locations] = await Promise.all([
+    const [vehicles, locations, bookings] = await Promise.all([
       db.vehicle.findMany({
         where: { status: "AVAILABLE" },
         include: { photos: { orderBy: { isPrimary: "desc" }, take: 1 } },
         orderBy: [{ make: "asc" }, { model: "asc" }],
       }),
       db.location.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+      db.booking.findMany({
+        where: { status: { in: ["CONFIRMED", "ACTIVE"] } },
+        select: { vehicleId: true, pickupDate: true, returnDate: true },
+      }),
     ])
-    return { vehicles, locations }
+    return { vehicles, locations, bookings }
   } catch {
-    return { vehicles: [], locations: [] }
+    return { vehicles: [], locations: [], bookings: [] }
   }
 }
 
@@ -35,7 +39,10 @@ export default async function BookingEnquiryPage({
     returnDate?: string
   }>
 }) {
-  const [{ vehicles, locations }, params] = await Promise.all([getFormOptions(), searchParams])
+  const [{ vehicles, locations, bookings }, params] = await Promise.all([
+    getFormOptions(),
+    searchParams,
+  ])
 
   // Never trust the URL directly — only carry values through that match a
   // real, currently-available vehicle/location.
@@ -63,7 +70,12 @@ export default async function BookingEnquiryPage({
         </p>
       </div>
 
-      <BookingEnquiryForm vehicles={vehicles} locations={locations} initialValues={initialValues} />
+      <BookingEnquiryForm
+        vehicles={vehicles}
+        locations={locations}
+        bookings={bookings}
+        initialValues={initialValues}
+      />
     </div>
   )
 }
