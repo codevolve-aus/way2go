@@ -145,7 +145,13 @@ export function AppSidebar({ user }: { user?: Session["user"] }) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-        <div className="flex items-center gap-2">
+        <Link
+          href="/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2"
+          title="Open customer-facing site in a new tab"
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold text-sm shrink-0">
             WZ
           </div>
@@ -153,7 +159,7 @@ export function AppSidebar({ user }: { user?: Session["user"] }) {
             <p className="text-sm font-semibold text-sidebar-foreground">WayZo</p>
             <p className="text-xs text-sidebar-foreground/60">Vehicle Rentals</p>
           </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <NavItems />
