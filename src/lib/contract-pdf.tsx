@@ -5,6 +5,7 @@ import {
   View,
   StyleSheet,
 } from "@react-pdf/renderer"
+import { billableDaysBetween } from "@/lib/pricing"
 
 const BLUE = "#1e40af"
 const LIGHT_BLUE = "#dbeafe"
@@ -134,12 +135,12 @@ function fmtDate(d: Date) {
   })
 }
 
-function fmtAUD(n: number) {
-  return n.toLocaleString("en-AU", { style: "currency", currency: "AUD" })
+function fmtDateTime(d: Date) {
+  return `${fmtDate(d)}, ${d.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}`
 }
 
-function durationDays(pickup: Date, ret: Date) {
-  return Math.round((ret.getTime() - pickup.getTime()) / 86400000) + 1
+function fmtAUD(n: number) {
+  return n.toLocaleString("en-AU", { style: "currency", currency: "AUD" })
 }
 
 export interface ContractPDFData {
@@ -246,7 +247,7 @@ const TERMS: { heading: string; body: string }[] = [
 ]
 
 export function ContractPDF({ data }: { data: ContractPDFData }) {
-  const days = durationDays(data.pickupDate, data.returnDate)
+  const days = billableDaysBetween(data.pickupDate, data.returnDate)
   const fullName = `${data.customer.firstName} ${data.customer.lastName}`
   const addressLine = [
     data.customer.address,
@@ -296,8 +297,8 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
         <Text style={s.sectionTitle}>Rental Details</Text>
         <View style={s.grid}>
           <View style={[s.col, s.infoBox]}>
-            <InfoRow label="Pickup Date" value={fmtDate(data.pickupDate)} />
-            <InfoRow label="Return Date" value={fmtDate(data.returnDate)} />
+            <InfoRow label="Pickup" value={fmtDateTime(data.pickupDate)} />
+            <InfoRow label="Return" value={fmtDateTime(data.returnDate)} />
             <InfoRow label="Duration" value={`${days} day${days !== 1 ? "s" : ""}`} />
             <InfoRow label="Pickup Location" value={data.pickupLocation} />
           </View>

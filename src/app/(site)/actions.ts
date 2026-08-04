@@ -36,13 +36,17 @@ function wrapEmail(title: string, rows: { label: string; value: string }[]) {
   `
 }
 
-function formatEnquiryDate(d: string) {
+function formatEnquiryDateTime(d: string, t?: string) {
   if (!d) return ""
-  return new Date(`${d}T00:00:00`).toLocaleDateString("en-AU", {
+  const dt = new Date(`${d}T${t || "00:00"}:00`)
+  const datePart = dt.toLocaleDateString("en-AU", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   })
+  if (!t) return datePart
+  const timePart = dt.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })
+  return `${datePart}, ${timePart}`
 }
 
 function formatCurrency(amount: number) {
@@ -115,14 +119,16 @@ function customerAckEmail(data: {
   vehicleCategory: string
   pickupLocation: string
   pickupDate: string
+  pickupTime?: string
   returnDate: string
+  returnTime?: string
   priceEstimate?: { breakdown: PriceBreakdown; discountApplied: boolean } | null
 }) {
   const rows: [string, string][] = [
     ["Preferred Vehicle", data.vehicleCategory],
     ["Pickup Location", data.pickupLocation],
-    ["Pickup Date", formatEnquiryDate(data.pickupDate)],
-    ["Return Date", formatEnquiryDate(data.returnDate)],
+    ["Pickup", formatEnquiryDateTime(data.pickupDate, data.pickupTime)],
+    ["Return", formatEnquiryDateTime(data.returnDate, data.returnTime)],
   ]
 
   return `
@@ -227,7 +233,9 @@ export async function submitBookingEnquiry(data: {
   vehicleCategory: string
   pickupLocation: string
   pickupDate: string
+  pickupTime?: string
   returnDate: string
+  returnTime?: string
   discountCode?: string
   notes: string
 }) {
@@ -239,6 +247,13 @@ export async function submitBookingEnquiry(data: {
   }
   if (!toEmail) {
     return { error: "This form isn't configured yet — please call one of our branches instead." }
+  }
+  if (data.pickupDate && data.returnDate) {
+    const pickupDt = new Date(`${data.pickupDate}T${data.pickupTime || "00:00"}:00`)
+    const returnDt = new Date(`${data.returnDate}T${data.returnTime || "00:00"}:00`)
+    if (returnDt <= pickupDt) {
+      return { error: "Return must be after pickup." }
+    }
   }
 
   const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`
@@ -258,7 +273,9 @@ export async function submitBookingEnquiry(data: {
       const result = await getPriceEstimate({
         categoryId: data.categoryId,
         pickupDate: data.pickupDate,
+        pickupTime: data.pickupTime,
         returnDate: data.returnDate,
+        returnTime: data.returnTime,
         discountCode: data.discountCode,
       })
       if (result.ok) {
@@ -281,8 +298,8 @@ export async function submitBookingEnquiry(data: {
       { label: "Phone", value: data.phone },
       { label: "Preferred Vehicle", value: data.vehicleCategory },
       { label: "Pickup Location", value: data.pickupLocation },
-      { label: "Pickup Date", value: data.pickupDate },
-      { label: "Return Date", value: data.returnDate },
+      { label: "Pickup", value: formatEnquiryDateTime(data.pickupDate, data.pickupTime) },
+      { label: "Return", value: formatEnquiryDateTime(data.returnDate, data.returnTime) },
       { label: "Promo Code", value: data.discountCode ?? "" },
       { label: "Notes", value: data.notes },
       ...(priceEstimate ? priceEstimateRows(priceEstimate.breakdown, priceEstimate.discountApplied) : []),

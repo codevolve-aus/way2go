@@ -15,6 +15,7 @@ import {
   Clock,
 } from "lucide-react"
 import { db } from "@/lib/db"
+import { billableDaysBetween } from "@/lib/pricing"
 
 export const metadata = { title: "Reports" }
 
@@ -77,13 +78,7 @@ export default async function ReportsPage() {
 
   const totalBookings = bookings.length
 
-  const durationsWithDays = bookings.map((b) => {
-    const days =
-      Math.round(
-        (b.returnDate.getTime() - b.pickupDate.getTime()) / 86400000
-      ) + 1
-    return days
-  })
+  const durationsWithDays = bookings.map((b) => billableDaysBetween(b.pickupDate, b.returnDate))
   const avgDuration =
     durationsWithDays.length > 0
       ? +(

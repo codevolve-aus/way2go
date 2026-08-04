@@ -247,7 +247,9 @@ function DiscountRevokeButton({
 function PricingPreview({ categories }: { categories: CategoryOption[] }) {
   const [categoryId, setCategoryId] = useState("")
   const [pickupDate, setPickupDate] = useState("")
+  const [pickupTime, setPickupTime] = useState("10:00")
   const [returnDate, setReturnDate] = useState("")
+  const [returnTime, setReturnTime] = useState("10:00")
   const [discountCode, setDiscountCode] = useState("")
   const [result, setResult] = useState<PriceEstimateResult | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -260,14 +262,16 @@ function PricingPreview({ categories }: { categories: CategoryOption[] }) {
         const r = await getPriceEstimate({
           categoryId,
           pickupDate,
+          pickupTime,
           returnDate,
+          returnTime,
           discountCode: discountCode || undefined,
         })
         setResult(r)
       })
     }, 350)
     return () => clearTimeout(handle)
-  }, [canEstimate, categoryId, pickupDate, returnDate, discountCode])
+  }, [canEstimate, categoryId, pickupDate, pickupTime, returnDate, returnTime, discountCode])
 
   return (
     <Card>
@@ -299,12 +303,22 @@ function PricingPreview({ categories }: { categories: CategoryOption[] }) {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>Pickup</Label>
+            <Label>Pickup Date</Label>
             <Input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Return</Label>
+            <Label>Pickup Time</Label>
+            <Input type="time" value={pickupTime} onChange={(e) => setPickupTime(e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Return Date</Label>
             <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Return Time</Label>
+            <Input type="time" value={returnTime} onChange={(e) => setReturnTime(e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">

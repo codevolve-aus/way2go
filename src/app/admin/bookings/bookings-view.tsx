@@ -82,6 +82,7 @@ import {
 
 import { createBooking, updateBooking, updateBookingStatus, sendContractEmail } from "./actions"
 import { getPriceEstimate, type PriceEstimateResult } from "@/lib/pricing-actions"
+import { billableDaysBetween } from "@/lib/pricing"
 
 type BookingRow = Booking & { customer: Customer; vehicle: Vehicle }
 type CustomerOption = Pick<Customer, "id" | "firstName" | "lastName">
@@ -152,12 +153,18 @@ const SOURCE_LABELS: Record<BookingSource, string> = {
   THIRD_PARTY: "Third Party",
 }
 
-function fmtDate(d: Date) {
-  return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })
+function fmtDateTime(d: Date) {
+  return d.toLocaleString("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
 }
 
 function getDurationDays(pickup: Date, returnDate: Date): number {
-  return Math.round((returnDate.getTime() - pickup.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  return billableDaysBetween(pickup, returnDate)
 }
 
 function StatusBadge({ status }: { status: BookingStatus }) {
@@ -383,8 +390,8 @@ function BookingsTable({
               <TableCell className="text-muted-foreground max-w-[200px] truncate">
                 {booking.vehicle.make} {booking.vehicle.model} ({booking.vehicle.registrationNo})
               </TableCell>
-              <TableCell className="text-muted-foreground">{fmtDate(booking.pickupDate)}</TableCell>
-              <TableCell className="text-muted-foreground">{fmtDate(booking.returnDate)}</TableCell>
+              <TableCell className="text-muted-foreground">{fmtDateTime(booking.pickupDate)}</TableCell>
+              <TableCell className="text-muted-foreground">{fmtDateTime(booking.returnDate)}</TableCell>
               <TableCell className="text-muted-foreground">
                 {getDurationDays(booking.pickupDate, booking.returnDate)}d
               </TableCell>
@@ -424,7 +431,9 @@ const emptyForm = {
   customerId: "",
   vehicleId: "",
   pickupDate: "",
+  pickupTime: "10:00",
   returnDate: "",
+  returnTime: "10:00",
   pickupLocation: "",
   source: "WALK_IN" as BookingSource,
   notes: "",
@@ -456,13 +465,15 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
         const result = await getPriceEstimate({
           categoryId: selectedVehicle.categoryId,
           pickupDate: form.pickupDate,
+          pickupTime: form.pickupTime,
           returnDate: form.returnDate,
+          returnTime: form.returnTime,
         })
         setEstimate(result)
       })
     }, 350)
     return () => clearTimeout(handle)
-  }, [canEstimate, selectedVehicle, form.pickupDate, form.returnDate])
+  }, [canEstimate, selectedVehicle, form.pickupDate, form.pickupTime, form.returnDate, form.returnTime])
 
   const today = new Date().toDateString()
   const pendingCount = bookings.filter((b) => b.status === "PENDING").length
@@ -493,6 +504,11 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
   }
 
+  function toTimeInput(d: Date | string): string {
+    const date = d instanceof Date ? d : new Date(d)
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
+  }
+
   function openAdd() {
     setEditingId(null)
     setForm(emptyForm)
@@ -505,7 +521,9 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
       customerId: booking.customerId,
       vehicleId: booking.vehicleId,
       pickupDate: toDateInput(booking.pickupDate),
+      pickupTime: toTimeInput(booking.pickupDate),
       returnDate: toDateInput(booking.returnDate),
+      returnTime: toTimeInput(booking.returnDate),
       pickupLocation: booking.pickupLocation,
       source: booking.source,
       notes: booking.notes ?? "",
@@ -564,15 +582,19 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
       toast.error("Please select pickup and return dates")
       return
     }
-    if (form.returnDate < form.pickupDate) {
-      toast.error("Return date must be after pickup date")
+    const pickupDt = new Date(`${form.pickupDate}T${form.pickupTime}:00`)
+    const returnDt = new Date(`${form.returnDate}T${form.returnTime}:00`)
+    if (returnDt <= pickupDt) {
+      toast.error("Return must be after pickup")
       return
     }
     const payload = {
       customerId: form.customerId,
       vehicleId: form.vehicleId,
       pickupDate: form.pickupDate,
+      pickupTime: form.pickupTime,
       returnDate: form.returnDate,
+      returnTime: form.returnTime,
       pickupLocation: form.pickupLocation,
       source: form.source,
       notes: form.notes || undefined,
@@ -778,29 +800,55 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
                 ))}
               </select>
             </div>
-            <DatePickerField
-              label="Pickup Date"
-              value={form.pickupDate}
-              onChange={(v) =>
-                setForm((f) => ({
-                  ...f,
-                  pickupDate: v,
-                  returnDate: f.returnDate && f.returnDate < v ? "" : f.returnDate,
-                }))
-              }
-              bookedRanges={bookedRanges}
-              required
-            />
-            <DatePickerField
-              label="Return Date"
-              value={form.returnDate}
-              onChange={(v) => setForm((f) => ({ ...f, returnDate: v }))}
-              bookedRanges={bookedRanges}
-              minDate={
-                form.pickupDate ? new Date(form.pickupDate + "T12:00:00") : undefined
-              }
-              required
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <DatePickerField
+                label="Pickup Date"
+                value={form.pickupDate}
+                onChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    pickupDate: v,
+                    returnDate: f.returnDate && f.returnDate < v ? "" : f.returnDate,
+                  }))
+                }
+                bookedRanges={bookedRanges}
+                required
+              />
+              <div className="space-y-1.5">
+                <Label>
+                  Pickup Time<span className="text-destructive ml-0.5">*</span>
+                </Label>
+                <Input
+                  type="time"
+                  value={form.pickupTime}
+                  onChange={(e) => setForm((f) => ({ ...f, pickupTime: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DatePickerField
+                label="Return Date"
+                value={form.returnDate}
+                onChange={(v) => setForm((f) => ({ ...f, returnDate: v }))}
+                bookedRanges={bookedRanges}
+                minDate={
+                  form.pickupDate ? new Date(form.pickupDate + "T12:00:00") : undefined
+                }
+                required
+              />
+              <div className="space-y-1.5">
+                <Label>
+                  Return Time<span className="text-destructive ml-0.5">*</span>
+                </Label>
+                <Input
+                  type="time"
+                  value={form.returnTime}
+                  onChange={(e) => setForm((f) => ({ ...f, returnTime: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
             {canEstimate && <BookingPriceEstimate result={estimate} isPending={isEstimating} />}
             <div className="space-y-1.5">
               <Label>Pickup Location</Label>

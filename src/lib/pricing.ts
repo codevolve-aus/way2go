@@ -50,9 +50,14 @@ function startOfDay(d: Date): Date {
   return copy
 }
 
-export function nightsBetween(pickup: Date, returnDate: Date): number {
-  const ms = startOfDay(returnDate).getTime() - startOfDay(pickup).getTime()
-  return Math.round(ms / (1000 * 60 * 60 * 24))
+// Billed in full 24-hour periods from the actual pickup timestamp, not
+// calendar nights — collecting at 2pm Monday and returning at 3pm Wednesday
+// is billed as 3 days (49 hours crosses into a third 24-hour period), the
+// same way most rental counters bill a late return.
+export function billableDaysBetween(pickup: Date, returnDate: Date): number {
+  const ms = returnDate.getTime() - pickup.getTime()
+  if (ms <= 0) return 0
+  return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 
 function countWeekendNights(pickup: Date, nights: number, weekendDays: number[]): number {
@@ -93,7 +98,7 @@ export function calculateRentalPrice(input: {
   discount?: DiscountInput
 }): PriceBreakdown {
   const { pickupDate, returnDate, rate, rules, discount } = input
-  const nights = Math.max(0, nightsBetween(pickupDate, returnDate))
+  const nights = billableDaysBetween(pickupDate, returnDate)
 
   if (nights === 0) {
     return {

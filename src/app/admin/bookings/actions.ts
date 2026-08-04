@@ -18,7 +18,9 @@ export async function createBooking(data: {
   customerId: string
   vehicleId: string
   pickupDate: string
+  pickupTime?: string
   returnDate: string
+  returnTime?: string
   pickupLocation: string
   source: BookingSource
   notes?: string
@@ -29,8 +31,8 @@ export async function createBooking(data: {
       bookingNumber,
       customerId: data.customerId,
       vehicleId: data.vehicleId,
-      pickupDate: new Date(data.pickupDate),
-      returnDate: new Date(data.returnDate),
+      pickupDate: new Date(`${data.pickupDate}T${data.pickupTime || "00:00"}:00`),
+      returnDate: new Date(`${data.returnDate}T${data.returnTime || "00:00"}:00`),
       pickupLocation: data.pickupLocation,
       source: data.source,
       notes: data.notes,
@@ -46,7 +48,9 @@ export async function updateBooking(
     customerId: string
     vehicleId: string
     pickupDate: string
+    pickupTime?: string
     returnDate: string
+    returnTime?: string
     pickupLocation: string
     source: BookingSource
     notes?: string
@@ -57,8 +61,8 @@ export async function updateBooking(
     data: {
       customerId: data.customerId,
       vehicleId: data.vehicleId,
-      pickupDate: new Date(data.pickupDate),
-      returnDate: new Date(data.returnDate),
+      pickupDate: new Date(`${data.pickupDate}T${data.pickupTime || "00:00"}:00`),
+      returnDate: new Date(`${data.returnDate}T${data.returnTime || "00:00"}:00`),
       pickupLocation: data.pickupLocation,
       source: data.source,
       notes: data.notes || null,
@@ -152,12 +156,11 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
     createElement(ContractPDF, { data: pdfData }) as unknown as ReactElement<DocumentProps>
   )
   const fullName = `${c.firstName} ${c.lastName}`
-  const pickupFmt = booking.pickupDate.toLocaleDateString("en-AU", {
-    day: "2-digit", month: "long", year: "numeric",
-  })
-  const returnFmt = booking.returnDate.toLocaleDateString("en-AU", {
-    day: "2-digit", month: "long", year: "numeric",
-  })
+  const dateTimeFmt: Intl.DateTimeFormatOptions = {
+    day: "2-digit", month: "long", year: "numeric", hour: "numeric", minute: "2-digit",
+  }
+  const pickupFmt = booking.pickupDate.toLocaleString("en-AU", dateTimeFmt)
+  const returnFmt = booking.returnDate.toLocaleString("en-AU", dateTimeFmt)
 
   const fromEmail = process.env.RESEND_FROM_EMAIL ?? "WayZo Rentals <noreply@wayzo.com.au>"
 
@@ -179,8 +182,8 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
             <tr><td style="padding:3px 0;color:#6b7280;width:160px">Booking Reference</td><td style="font-weight:bold">${booking.bookingNumber}</td></tr>
             <tr><td style="padding:3px 0;color:#6b7280">Vehicle</td><td style="font-weight:bold">${booking.vehicle.year} ${booking.vehicle.make} ${booking.vehicle.model}</td></tr>
             <tr><td style="padding:3px 0;color:#6b7280">Registration</td><td style="font-weight:bold">${booking.vehicle.registrationNo}</td></tr>
-            <tr><td style="padding:3px 0;color:#6b7280">Pickup Date</td><td style="font-weight:bold">${pickupFmt}</td></tr>
-            <tr><td style="padding:3px 0;color:#6b7280">Return Date</td><td style="font-weight:bold">${returnFmt}</td></tr>
+            <tr><td style="padding:3px 0;color:#6b7280">Pickup</td><td style="font-weight:bold">${pickupFmt}</td></tr>
+            <tr><td style="padding:3px 0;color:#6b7280">Return</td><td style="font-weight:bold">${returnFmt}</td></tr>
             <tr><td style="padding:3px 0;color:#6b7280">Pickup Location</td><td style="font-weight:bold">${booking.pickupLocation}</td></tr>
           </table>
         </div>

@@ -35,7 +35,9 @@ const emptyForm = {
   categoryId: "",
   pickupLocation: "",
   pickupDate: "",
+  pickupTime: "10:00",
   returnDate: "",
+  returnTime: "10:00",
   discountCode: "",
   notes: "",
 }
@@ -120,14 +122,24 @@ export function BookingEnquiryForm({
         const result = await getPriceEstimate({
           categoryId: form.categoryId,
           pickupDate: form.pickupDate,
+          pickupTime: form.pickupTime,
           returnDate: form.returnDate,
+          returnTime: form.returnTime,
           discountCode: form.discountCode || undefined,
         })
         setEstimate(result)
       })
     }, 350)
     return () => clearTimeout(handle)
-  }, [canEstimate, form.categoryId, form.pickupDate, form.returnDate, form.discountCode])
+  }, [
+    canEstimate,
+    form.categoryId,
+    form.pickupDate,
+    form.pickupTime,
+    form.returnDate,
+    form.returnTime,
+    form.discountCode,
+  ])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -138,6 +150,14 @@ export function BookingEnquiryForm({
     if (!isValidAustralianPhone(form.phone)) {
       toast.error("Please enter a valid Australian phone number.")
       return
+    }
+    if (form.pickupDate && form.returnDate) {
+      const pickupDt = new Date(`${form.pickupDate}T${form.pickupTime}:00`)
+      const returnDt = new Date(`${form.returnDate}T${form.returnTime}:00`)
+      if (returnDt <= pickupDt) {
+        toast.error("Return must be after pickup.")
+        return
+      }
     }
     startTransition(async () => {
       const categoryName = categories.find((c) => c.id === form.categoryId)?.name ?? ""
@@ -150,7 +170,9 @@ export function BookingEnquiryForm({
         vehicleCategory: categoryName,
         pickupLocation: form.pickupLocation,
         pickupDate: form.pickupDate,
+        pickupTime: form.pickupTime,
         returnDate: form.returnDate,
+        returnTime: form.returnTime,
         discountCode: form.discountCode,
         notes: form.notes,
       })
@@ -262,6 +284,19 @@ export function BookingEnquiryForm({
           />
         </div>
         <div className="space-y-1.5">
+          <Label htmlFor="enquiry-pickup-time">Pickup Time</Label>
+          <Input
+            id="enquiry-pickup-time"
+            type="time"
+            required
+            value={form.pickupTime}
+            onChange={(e) => setForm({ ...form, pickupTime: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
           <Label htmlFor="enquiry-return-date">Return Date</Label>
           <Input
             id="enquiry-return-date"
@@ -269,6 +304,16 @@ export function BookingEnquiryForm({
             required
             value={form.returnDate}
             onChange={(e) => setForm({ ...form, returnDate: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="enquiry-return-time">Return Time</Label>
+          <Input
+            id="enquiry-return-time"
+            type="time"
+            required
+            value={form.returnTime}
+            onChange={(e) => setForm({ ...form, returnTime: e.target.value })}
           />
         </div>
       </div>

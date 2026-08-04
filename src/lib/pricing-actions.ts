@@ -44,7 +44,9 @@ export type PriceEstimateResult =
 export async function getPriceEstimate(input: {
   categoryId: string
   pickupDate: string
+  pickupTime?: string
   returnDate: string
+  returnTime?: string
   discountCode?: string
 }): Promise<PriceEstimateResult> {
   const { categoryId, pickupDate: pickupStr, returnDate: returnStr, discountCode } = input
@@ -53,14 +55,14 @@ export async function getPriceEstimate(input: {
     return { ok: false, error: "Select a vehicle category and both dates" }
   }
 
-  const pickupDate = new Date(`${pickupStr}T00:00:00`)
-  const returnDate = new Date(`${returnStr}T00:00:00`)
+  const pickupDate = new Date(`${pickupStr}T${input.pickupTime || "10:00"}:00`)
+  const returnDate = new Date(`${returnStr}T${input.returnTime || "10:00"}:00`)
 
   if (Number.isNaN(pickupDate.getTime()) || Number.isNaN(returnDate.getTime())) {
     return { ok: false, error: "Invalid dates" }
   }
   if (returnDate <= pickupDate) {
-    return { ok: false, error: "Return date must be after pickup date" }
+    return { ok: false, error: "Return must be after pickup" }
   }
 
   const rates = await db.rentalRate.findMany({ where: { categoryId } })
@@ -68,8 +70,11 @@ export async function getPriceEstimate(input: {
     return { ok: false, error: "No rate card configured for this category yet" }
   }
 
+  // Seasonal windows are calendar-date ranges, not time-of-day sensitive —
+  // compare against midnight of the pickup date, not the exact pickup time.
+  const pickupDateOnly = new Date(`${pickupStr}T00:00:00`)
   const seasonal = rates.find(
-    (r) => r.startDate && r.endDate && r.startDate <= pickupDate && r.endDate >= pickupDate
+    (r) => r.startDate && r.endDate && r.startDate <= pickupDateOnly && r.endDate >= pickupDateOnly
   )
   const rate = seasonal ?? rates.find((r) => r.isDefault) ?? rates[0]
 
