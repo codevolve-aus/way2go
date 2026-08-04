@@ -106,8 +106,11 @@ export async function SiteFooter() {
       </div>
 
       <div className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} WayZo Vehicle Rentals. All rights reserved.
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>&copy; {new Date().getFullYear()} WayZo Vehicle Rentals. All rights reserved.</span>
+          <Link href="/sign-in" className="hover:text-foreground transition-colors">
+            Staff Login
+          </Link>
         </div>
       </div>
     </footer>
