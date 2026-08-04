@@ -1,17 +1,32 @@
 // Rental pricing engine — Turo-style: cheapest of daily/weekly/monthly proration,
-// plus a configurable weekend-night surcharge, promo discount, service fee and tax.
+// plus a configurable per-day-of-week surcharge, peak-period (seasonal/event) surcharge,
+// promo discount, service fee and tax.
+//
+// Day-of-week and peak-period surcharges are both expressed as a % added on top of
+// the per-night rate and stack additively for a given night (e.g. a Saturday night
+// that also falls in a peak period gets both surcharges), mirroring how rental
+// platforms layer a weekly rate calendar with seasonal/event-week surcharges rather
+// than swapping out the whole rate card for short-term demand spikes.
+
+export interface PeakPeriod {
+  id: string
+  name: string
+  startDate: string // YYYY-MM-DD, inclusive
+  endDate: string // YYYY-MM-DD, inclusive
+  surchargePct: number
+}
 
 export interface PricingRules {
-  weekendSurchargePct: number
-  weekendDays: number[] // 0 = Sunday … 6 = Saturday
+  dayOfWeekSurchargePct: Record<number, number> // keyed 0 = Sunday … 6 = Saturday
+  peakPeriods: PeakPeriod[]
   serviceFeePct: number
   taxRatePct: number
   minRentalDays: number
 }
 
 export const DEFAULT_PRICING_RULES: PricingRules = {
-  weekendSurchargePct: 15,
-  weekendDays: [5, 6], // Friday & Saturday nights
+  dayOfWeekSurchargePct: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 15, 6: 15 }, // Friday & Saturday nights
+  peakPeriods: [],
   serviceFeePct: 8,
   taxRatePct: 10,
   minRentalDays: 1,
@@ -32,10 +47,12 @@ export type BaseRateType = "daily" | "weekly" | "monthly"
 
 export interface PriceBreakdown {
   nights: number
-  weekendNights: number
+  weekendNights: number // nights with a day-of-week surcharge applied
+  peakNights: number // nights falling within a peak period
   baseRateType: BaseRateType
   baseSubtotal: number
-  weekendSurcharge: number
+  weekendSurcharge: number // $ from day-of-week surcharge
+  peakSurcharge: number // $ from peak-period surcharge
   rentalSubtotal: number
   discountAmount: number
   serviceFee: number
@@ -60,14 +77,41 @@ export function billableDaysBetween(pickup: Date, returnDate: Date): number {
   return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 
-function countWeekendNights(pickup: Date, nights: number, weekendDays: number[]): number {
-  let count = 0
+function isWithinPeakPeriod(date: Date, period: PeakPeriod): boolean {
+  const start = new Date(`${period.startDate}T00:00:00`)
+  const end = new Date(`${period.endDate}T00:00:00`)
+  return date >= start && date <= end
+}
+
+// Sums the per-night day-of-week and peak-period surcharge %s across the
+// stay. Multiple overlapping peak periods on the same night use the
+// highest one, not a stacked sum, to avoid runaway surcharges.
+function nightSurcharges(
+  pickup: Date,
+  nights: number,
+  rules: PricingRules
+): { weekendNights: number; peakNights: number; dayOfWeekPct: number; peakPct: number } {
+  let weekendNights = 0
+  let peakNights = 0
+  let dayOfWeekPct = 0
+  let peakPct = 0
   const cursor = startOfDay(pickup)
+
   for (let i = 0; i < nights; i++) {
-    if (weekendDays.includes(cursor.getDay())) count++
+    const dayPct = rules.dayOfWeekSurchargePct[cursor.getDay()] ?? 0
+    if (dayPct > 0) weekendNights++
+    dayOfWeekPct += dayPct
+
+    const nightPeakPct = rules.peakPeriods.reduce((max, p) => {
+      return isWithinPeakPeriod(cursor, p) ? Math.max(max, p.surchargePct) : max
+    }, 0)
+    if (nightPeakPct > 0) peakNights++
+    peakPct += nightPeakPct
+
     cursor.setDate(cursor.getDate() + 1)
   }
-  return count
+
+  return { weekendNights, peakNights, dayOfWeekPct, peakPct }
 }
 
 function cheapestBaseRate(nights: number, rate: RateCardInput): { type: BaseRateType; amount: number } {
@@ -104,9 +148,11 @@ export function calculateRentalPrice(input: {
     return {
       nights: 0,
       weekendNights: 0,
+      peakNights: 0,
       baseRateType: "daily",
       baseSubtotal: 0,
       weekendSurcharge: 0,
+      peakSurcharge: 0,
       rentalSubtotal: 0,
       discountAmount: 0,
       serviceFee: 0,
@@ -117,12 +163,16 @@ export function calculateRentalPrice(input: {
   }
 
   const { type: baseRateType, amount: baseSubtotal } = cheapestBaseRate(nights, rate)
-  const weekendNights = countWeekendNights(pickupDate, nights, rules.weekendDays)
+  const { weekendNights, peakNights, dayOfWeekPct, peakPct } = nightSurcharges(
+    pickupDate,
+    nights,
+    rules
+  )
   const perNightEquivalent = baseSubtotal / nights
-  const weekendSurcharge =
-    weekendNights * perNightEquivalent * (rules.weekendSurchargePct / 100)
+  const weekendSurcharge = perNightEquivalent * (dayOfWeekPct / 100)
+  const peakSurcharge = perNightEquivalent * (peakPct / 100)
 
-  const rentalSubtotal = baseSubtotal + weekendSurcharge
+  const rentalSubtotal = baseSubtotal + weekendSurcharge + peakSurcharge
 
   let discountAmount = 0
   if (discount?.discountPct) {
@@ -139,9 +189,11 @@ export function calculateRentalPrice(input: {
   return {
     nights,
     weekendNights,
+    peakNights,
     baseRateType,
     baseSubtotal: round2(baseSubtotal),
     weekendSurcharge: round2(weekendSurcharge),
+    peakSurcharge: round2(peakSurcharge),
     rentalSubtotal: round2(rentalSubtotal),
     discountAmount: round2(discountAmount),
     serviceFee: round2(serviceFee),

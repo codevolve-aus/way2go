@@ -56,7 +56,7 @@ import {
   toggleDiscountCode,
 } from "./actions"
 import { updatePricingRules, getPriceEstimate, type PriceEstimateResult } from "@/lib/pricing-actions"
-import type { PricingRules } from "@/lib/pricing"
+import type { PricingRules, PeakPeriod } from "@/lib/pricing"
 
 type CategoryOption = { id: string; name: string }
 
@@ -347,8 +347,14 @@ function PricingPreview({ categories }: { categories: CategoryOption[] }) {
             </div>
             {result.breakdown.weekendSurcharge > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Weekend surcharge ({result.breakdown.weekendNights} night(s))</span>
+                <span>Day-of-week surcharge ({result.breakdown.weekendNights} night(s))</span>
                 <span>+{formatCurrency(result.breakdown.weekendSurcharge)}</span>
+              </div>
+            )}
+            {result.breakdown.peakSurcharge > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Peak season surcharge ({result.breakdown.peakNights} night(s))</span>
+                <span>+{formatCurrency(result.breakdown.peakSurcharge)}</span>
               </div>
             )}
             {result.discountApplied && (
@@ -473,17 +479,55 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
   const [rulesForm, setRulesForm] = useState(pricingRules)
   const [isSavingRules, startRulesTransition] = useTransition()
 
-  function toggleWeekendDay(day: number) {
+  function setDayOfWeekPct(day: number, pct: number) {
     setRulesForm((f) => ({
       ...f,
-      weekendDays: f.weekendDays.includes(day)
-        ? f.weekendDays.filter((d) => d !== day)
-        : [...f.weekendDays, day].sort(),
+      dayOfWeekSurchargePct: { ...f.dayOfWeekSurchargePct, [day]: pct },
+    }))
+  }
+
+  function addPeakPeriod() {
+    setRulesForm((f) => ({
+      ...f,
+      peakPeriods: [
+        ...f.peakPeriods,
+        {
+          id: crypto.randomUUID(),
+          name: "",
+          startDate: "",
+          endDate: "",
+          surchargePct: 20,
+        },
+      ],
+    }))
+  }
+
+  function updatePeakPeriod(id: string, patch: Partial<PeakPeriod>) {
+    setRulesForm((f) => ({
+      ...f,
+      peakPeriods: f.peakPeriods.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }))
+  }
+
+  function removePeakPeriod(id: string) {
+    setRulesForm((f) => ({
+      ...f,
+      peakPeriods: f.peakPeriods.filter((p) => p.id !== id),
     }))
   }
 
   function handleRulesSubmit(e: React.FormEvent) {
     e.preventDefault()
+    for (const p of rulesForm.peakPeriods) {
+      if (!p.name.trim() || !p.startDate || !p.endDate) {
+        toast.error("Each peak period needs a name, start date and end date")
+        return
+      }
+      if (p.endDate < p.startDate) {
+        toast.error(`"${p.name}" end date must be on or after its start date`)
+        return
+      }
+    }
     startRulesTransition(async () => {
       try {
         await updatePricingRules(rulesForm)
@@ -755,29 +799,17 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
 
         {/* ---- Pricing Rules Tab ---- */}
         <TabsContent value="rules" className="mt-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader className="border-b border-border pb-4">
-                <CardTitle className="text-base font-medium">Global Pricing Rules</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Applied on top of every rate card when estimating a price.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleRulesSubmit} className="flex flex-col gap-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label>Weekend Surcharge (%)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={rulesForm.weekendSurchargePct}
-                        onChange={(e) =>
-                          setRulesForm((f) => ({ ...f, weekendSurchargePct: parseFloat(e.target.value) || 0 }))
-                        }
-                      />
-                    </div>
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            <form onSubmit={handleRulesSubmit} className="flex flex-col gap-4">
+              <Card>
+                <CardHeader className="border-b border-border pb-4">
+                  <CardTitle className="text-base font-medium">Global Pricing Rules</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Applied on top of every rate card when estimating a price.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-1.5">
                       <Label>Minimum Rental (days)</Label>
                       <Input
@@ -815,41 +847,136 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>Weekend Nights</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Nights on these days carry the weekend surcharge above.
-                    </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {weekdayLabels.map((d) => {
-                        const active = rulesForm.weekendDays.includes(d.value)
-                        return (
-                          <button
-                            key={d.value}
-                            type="button"
-                            onClick={() => toggleWeekendDay(d.value)}
-                            className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors ${
-                              active
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-transparent text-muted-foreground border-input hover:bg-muted"
-                            }`}
-                          >
-                            {d.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={isSavingRules}>
-                      {isSavingRules ? "Saving…" : "Save Rules"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            <PricingPreview categories={categories} />
+              <Card>
+                <CardHeader className="border-b border-border pb-4">
+                  <CardTitle className="text-base font-medium">Day-of-Week Pricing</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Per-night surcharge added on top of the base rate, by day of week —
+                    set Friday/Saturday for a classic weekend bump, or price every day
+                    individually.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
+                    {weekdayLabels.map((d) => (
+                      <div key={d.value} className="space-y-1.5">
+                        <Label className="text-xs">{d.label}</Label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            className="pr-6"
+                            value={rulesForm.dayOfWeekSurchargePct[d.value] ?? 0}
+                            onChange={(e) =>
+                              setDayOfWeekPct(d.value, parseFloat(e.target.value) || 0)
+                            }
+                          />
+                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="border-b border-border pb-4 flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-base font-medium">Peak Periods</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Extra surcharge for named date ranges — holidays, long weekends,
+                      school breaks. Stacks with the day-of-week surcharge above; where
+                      two peak periods overlap the same night, the higher one applies.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addPeakPeriod}>
+                    <Plus className="h-4 w-4" />
+                    Add Period
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {rulesForm.peakPeriods.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">
+                      No peak periods configured — pricing follows the day-of-week rules only.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {rulesForm.peakPeriods.map((p) => (
+                        <div
+                          key={p.id}
+                          className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_90px_auto] gap-2 items-end rounded-lg border border-border p-3"
+                        >
+                          <div className="space-y-1 col-span-2 sm:col-span-1">
+                            <Label className="text-xs">Name</Label>
+                            <Input
+                              value={p.name}
+                              placeholder="Christmas / New Year"
+                              onChange={(e) => updatePeakPeriod(p.id, { name: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Start Date</Label>
+                            <Input
+                              type="date"
+                              value={p.startDate}
+                              onChange={(e) => updatePeakPeriod(p.id, { startDate: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">End Date</Label>
+                            <Input
+                              type="date"
+                              value={p.endDate}
+                              onChange={(e) => updatePeakPeriod(p.id, { endDate: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Surcharge (%)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={p.surchargePct}
+                              onChange={(e) =>
+                                updatePeakPeriod(p.id, {
+                                  surchargePct: parseFloat(e.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => removePeakPeriod(p.id)}
+                            aria-label="Remove peak period"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-end">
+                <Button type="submit" disabled={isSavingRules}>
+                  {isSavingRules ? "Saving…" : "Save Rules"}
+                </Button>
+              </div>
+            </form>
+
+            <div className="lg:sticky lg:top-6">
+              <PricingPreview categories={categories} />
+            </div>
           </div>
         </TabsContent>
       </Tabs>
