@@ -69,7 +69,7 @@ export function ContactForm() {
           onChange={(e) => setForm({ ...form, message: e.target.value })}
         />
       </div>
-      <Button type="submit" size="lg" disabled={isPending} className="w-full sm:w-auto">
+      <Button type="submit" size="xl" disabled={isPending} className="w-full sm:w-auto">
         {isPending ? "Sending..." : "Send Message"}
       </Button>
     </form>

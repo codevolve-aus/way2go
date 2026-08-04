@@ -21,8 +21,8 @@ export default async function PrivacyPolicyPage() {
   const doc = await getDocument()
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
-      <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-16 sm:py-20">
+      <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-balance">
         {doc?.title ?? "Privacy Policy"}
       </h1>
       {doc && (
@@ -37,10 +37,10 @@ export default async function PrivacyPolicyPage() {
       )}
 
       {doc ? (
-        <div className="mt-10 space-y-8">
+        <div className="mt-10 divide-y divide-border">
           {doc.sections.map((section) => (
-            <section key={section.id}>
-              <h2 className="text-lg font-semibold mb-2">{section.heading}</h2>
+            <section key={section.id} className="py-6 first:pt-0 last:pb-0">
+              <h2 className="text-lg font-semibold mb-2 text-foreground">{section.heading}</h2>
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                 {section.body}
               </p>
@@ -48,7 +48,7 @@ export default async function PrivacyPolicyPage() {
           ))}
         </div>
       ) : (
-        <p className="mt-10 text-sm text-muted-foreground">
+        <p className="mt-10 rounded-2xl bg-muted/40 ring-1 ring-foreground/10 p-6 text-sm text-muted-foreground">
           This page is being updated. Please check back shortly, or contact us directly.
         </p>
       )}

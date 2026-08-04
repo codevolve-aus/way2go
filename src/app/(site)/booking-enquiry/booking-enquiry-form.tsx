@@ -42,6 +42,13 @@ const emptyForm = {
   notes: "",
 }
 
+export interface InitialValues {
+  vehicleId?: string
+  pickupLocation?: string
+  pickupDate?: string
+  returnDate?: string
+}
+
 function PriceEstimateCard({ result, isPending }: { result: PriceEstimateResult | null; isPending: boolean }) {
   if (isPending) {
     return <p className="text-sm text-muted-foreground">Calculating your estimate…</p>
@@ -153,11 +160,13 @@ function VehiclePreview({ vehicle }: { vehicle: VehicleOption }) {
 export function BookingEnquiryForm({
   vehicles,
   locations,
+  initialValues,
 }: {
   vehicles: VehicleOption[]
   locations: { id: string; name: string }[]
+  initialValues?: InitialValues
 }) {
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState({ ...emptyForm, ...initialValues })
   const [isPending, startTransition] = useTransition()
   const [estimate, setEstimate] = useState<PriceEstimateResult | null>(null)
   const [isEstimating, startEstimateTransition] = useTransition()
@@ -239,167 +248,180 @@ export function BookingEnquiryForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+    <form
+      onSubmit={handleSubmit}
+      className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8 lg:items-start"
+    >
+      <div className="space-y-4 rounded-2xl bg-card ring-1 ring-foreground/10 p-5 sm:p-7">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-first-name">First Name</Label>
+            <Input
+              id="enquiry-first-name"
+              required
+              value={form.firstName}
+              onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-last-name">Last Name</Label>
+            <Input
+              id="enquiry-last-name"
+              required
+              value={form.lastName}
+              onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-phone">Phone</Label>
+            <Input
+              id="enquiry-phone"
+              type="tel"
+              required
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-email">Email</Label>
+            <Input
+              id="enquiry-email"
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-vehicle">
+              Select Vehicle<span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Select
+              items={vehicles.map((v) => ({ value: v.id, label: vehicleLabel(v) }))}
+              value={form.vehicleId}
+              onValueChange={(v) => setForm({ ...form, vehicleId: v ?? "" })}
+            >
+              <SelectTrigger id="enquiry-vehicle" className="w-full">
+                <SelectValue placeholder="Select a vehicle" />
+              </SelectTrigger>
+              <SelectContent>
+                {vehicles.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {vehicleLabel(v)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-location">Pickup Location</Label>
+            <Select
+              value={form.pickupLocation}
+              onValueChange={(v) => setForm({ ...form, pickupLocation: v ?? "" })}
+            >
+              <SelectTrigger id="enquiry-location" className="w-full">
+                <SelectValue placeholder="Select a branch" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((l) => (
+                  <SelectItem key={l.id} value={l.name}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-pickup-date">Pickup Date</Label>
+            <Input
+              id="enquiry-pickup-date"
+              type="date"
+              required
+              value={form.pickupDate}
+              onChange={(e) => setForm({ ...form, pickupDate: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-pickup-time">Pickup Time</Label>
+            <Input
+              id="enquiry-pickup-time"
+              type="time"
+              required
+              value={form.pickupTime}
+              onChange={(e) => setForm({ ...form, pickupTime: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-return-date">Return Date</Label>
+            <Input
+              id="enquiry-return-date"
+              type="date"
+              required
+              value={form.returnDate}
+              onChange={(e) => setForm({ ...form, returnDate: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="enquiry-return-time">Return Time</Label>
+            <Input
+              id="enquiry-return-time"
+              type="time"
+              required
+              value={form.returnTime}
+              onChange={(e) => setForm({ ...form, returnTime: e.target.value })}
+            />
+          </div>
+        </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="enquiry-first-name">First Name</Label>
+          <Label htmlFor="enquiry-discount">Promo Code (optional)</Label>
           <Input
-            id="enquiry-first-name"
-            required
-            value={form.firstName}
-            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+            id="enquiry-discount"
+            value={form.discountCode}
+            onChange={(e) => setForm({ ...form, discountCode: e.target.value.toUpperCase() })}
+            placeholder="SUMMER20"
           />
         </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="enquiry-last-name">Last Name</Label>
-          <Input
-            id="enquiry-last-name"
-            required
-            value={form.lastName}
-            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+          <Label htmlFor="enquiry-notes">Notes (optional)</Label>
+          <Textarea
+            id="enquiry-notes"
+            rows={4}
+            placeholder="Anything else we should know?"
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
         </div>
+
+        <Button type="submit" size="xl" disabled={isPending} className="w-full sm:w-auto">
+          {isPending ? "Sending..." : "Send Enquiry"}
+        </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-phone">Phone</Label>
-          <Input
-            id="enquiry-phone"
-            type="tel"
-            required
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-email">Email</Label>
-          <Input
-            id="enquiry-email"
-            type="email"
-            required
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-        </div>
+      <div className="mt-6 lg:mt-0 lg:sticky lg:top-24 space-y-4">
+        {selectedVehicle && <VehiclePreview vehicle={selectedVehicle} />}
+        {canEstimate && <PriceEstimateCard result={estimate} isPending={isEstimating} />}
+        {!selectedVehicle && (
+          <Card className="bg-muted/40">
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              Select a vehicle and your dates to see an estimated price here.
+            </CardContent>
+          </Card>
+        )}
       </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-vehicle">
-            Select Vehicle<span className="text-destructive ml-0.5">*</span>
-          </Label>
-          <Select
-            items={vehicles.map((v) => ({ value: v.id, label: vehicleLabel(v) }))}
-            value={form.vehicleId}
-            onValueChange={(v) => setForm({ ...form, vehicleId: v ?? "" })}
-          >
-            <SelectTrigger id="enquiry-vehicle" className="w-full">
-              <SelectValue placeholder="Select a vehicle" />
-            </SelectTrigger>
-            <SelectContent>
-              {vehicles.map((v) => (
-                <SelectItem key={v.id} value={v.id}>
-                  {vehicleLabel(v)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-location">Pickup Location</Label>
-          <Select
-            value={form.pickupLocation}
-            onValueChange={(v) => setForm({ ...form, pickupLocation: v ?? "" })}
-          >
-            <SelectTrigger id="enquiry-location" className="w-full">
-              <SelectValue placeholder="Select a branch" />
-            </SelectTrigger>
-            <SelectContent>
-              {locations.map((l) => (
-                <SelectItem key={l.id} value={l.name}>
-                  {l.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {selectedVehicle && <VehiclePreview vehicle={selectedVehicle} />}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-pickup-date">Pickup Date</Label>
-          <Input
-            id="enquiry-pickup-date"
-            type="date"
-            required
-            value={form.pickupDate}
-            onChange={(e) => setForm({ ...form, pickupDate: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-pickup-time">Pickup Time</Label>
-          <Input
-            id="enquiry-pickup-time"
-            type="time"
-            required
-            value={form.pickupTime}
-            onChange={(e) => setForm({ ...form, pickupTime: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-return-date">Return Date</Label>
-          <Input
-            id="enquiry-return-date"
-            type="date"
-            required
-            value={form.returnDate}
-            onChange={(e) => setForm({ ...form, returnDate: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="enquiry-return-time">Return Time</Label>
-          <Input
-            id="enquiry-return-time"
-            type="time"
-            required
-            value={form.returnTime}
-            onChange={(e) => setForm({ ...form, returnTime: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="enquiry-discount">Promo Code (optional)</Label>
-        <Input
-          id="enquiry-discount"
-          value={form.discountCode}
-          onChange={(e) => setForm({ ...form, discountCode: e.target.value.toUpperCase() })}
-          placeholder="SUMMER20"
-        />
-      </div>
-
-      {canEstimate && <PriceEstimateCard result={estimate} isPending={isEstimating} />}
-
-      <div className="space-y-1.5">
-        <Label htmlFor="enquiry-notes">Notes (optional)</Label>
-        <Textarea
-          id="enquiry-notes"
-          rows={4}
-          placeholder="Anything else we should know?"
-          value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-        />
-      </div>
-
-      <Button type="submit" size="lg" disabled={isPending} className="w-full sm:w-auto">
-        {isPending ? "Sending..." : "Send Enquiry"}
-      </Button>
     </form>
   )
 }
