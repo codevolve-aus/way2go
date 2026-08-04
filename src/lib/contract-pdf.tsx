@@ -27,6 +27,7 @@ const s = StyleSheet.create({
   },
   brand: { fontSize: 20, fontFamily: "Helvetica-Bold", color: BLUE },
   brandSub: { fontSize: 9, color: GRAY, marginTop: 2 },
+  brandLegal: { fontSize: 7, color: GRAY, marginTop: 1 },
   contractLabel: { fontSize: 9, color: GRAY, textAlign: "right" },
   contractNumber: {
     fontSize: 13,
@@ -259,7 +260,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
   return (
     <Document
       title={`Rental Agreement ${data.contractNumber}`}
-      author="WayZo Vehicle Rentals"
+      author="WAYZO PTY LTD"
     >
       {/* ── Page 1: Contract Details ── */}
       <Page size="A4" style={s.page}>
@@ -268,6 +269,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
           <View>
             <Text style={s.brand}>WayZo</Text>
             <Text style={s.brandSub}>Vehicle Rentals</Text>
+            <Text style={s.brandLegal}>WAYZO PTY LTD &middot; ABN 99 700 912 698</Text>
           </View>
           <View>
             <Text style={s.contractLabel}>RENTAL AGREEMENT</Text>
@@ -365,7 +367,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
 
         {/* Footer */}
         <View style={s.pageNumber}>
-          <Text>WayZo Vehicle Rentals — Rental Agreement {data.contractNumber}</Text>
+          <Text>WayZo Vehicle Rentals (WAYZO PTY LTD, ABN 99 700 912 698) — Rental Agreement {data.contractNumber}</Text>
           <Text>Page 1 of 2 — See overleaf for full Terms and Conditions</Text>
         </View>
       </Page>
@@ -376,6 +378,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
           <View>
             <Text style={s.brand}>WayZo</Text>
             <Text style={s.brandSub}>Vehicle Rentals</Text>
+            <Text style={s.brandLegal}>WAYZO PTY LTD &middot; ABN 99 700 912 698</Text>
           </View>
           <View>
             <Text style={[s.contractLabel, { textAlign: "right" }]}>
@@ -424,7 +427,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
         </View>
 
         <View style={s.pageNumber}>
-          <Text>WayZo Vehicle Rentals — Rental Agreement {data.contractNumber}</Text>
+          <Text>WayZo Vehicle Rentals (WAYZO PTY LTD, ABN 99 700 912 698) — Rental Agreement {data.contractNumber}</Text>
           <Text>Page 2 of 2</Text>
         </View>
       </Page>

@@ -30,6 +30,9 @@ export default async function ContactPage() {
         <p className="mt-2 text-muted-foreground max-w-xl mx-auto">
           Have a question about a rental? Send us a message and we&apos;ll get back to you.
         </p>
+        <p className="mt-4 text-xs text-muted-foreground">
+          WAYZO PTY LTD &middot; ABN 99 700 912 698
+        </p>
       </div>
 
       <div className="grid gap-10 lg:grid-cols-2">

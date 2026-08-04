@@ -107,7 +107,10 @@ export async function SiteFooter() {
 
       <div className="border-t border-border">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>&copy; {new Date().getFullYear()} WayZo Vehicle Rentals. All rights reserved.</span>
+          <span>
+            &copy; {new Date().getFullYear()} WAYZO PTY LTD (ABN 99 700 912 698), trading as WayZo
+            Vehicle Rentals. All rights reserved.
+          </span>
           <Link href="/sign-in" className="hover:text-foreground transition-colors">
             Staff Login
           </Link>

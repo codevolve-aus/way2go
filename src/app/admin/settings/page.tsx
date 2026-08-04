@@ -94,11 +94,11 @@ export default async function SettingsPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2 space-y-1.5">
                   <Label htmlFor="company-name">Company Name</Label>
-                  <Input id="company-name" placeholder="Your company name" />
+                  <Input id="company-name" defaultValue="WAYZO PTY LTD" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="abn">ABN</Label>
-                  <Input id="abn" placeholder="12 345 678 901" />
+                  <Input id="abn" defaultValue="99 700 912 698" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Phone</Label>
