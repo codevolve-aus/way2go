@@ -33,6 +33,67 @@ function wrapEmail(title: string, rows: { label: string; value: string }[]) {
   `
 }
 
+function formatEnquiryDate(d: string) {
+  if (!d) return ""
+  return new Date(`${d}T00:00:00`).toLocaleDateString("en-AU", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  })
+}
+
+function customerAckEmail(data: {
+  name: string
+  vehicleCategory: string
+  pickupLocation: string
+  pickupDate: string
+  returnDate: string
+}) {
+  const rows: [string, string][] = [
+    ["Preferred Vehicle", data.vehicleCategory],
+    ["Pickup Location", data.pickupLocation],
+    ["Pickup Date", formatEnquiryDate(data.pickupDate)],
+    ["Return Date", formatEnquiryDate(data.returnDate)],
+  ]
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827">
+      <div style="background:#1e40af;padding:24px 32px;border-radius:8px 8px 0 0">
+        <h1 style="color:#fff;margin:0;font-size:20px">WayZo Vehicle Rentals</h1>
+        <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px">We&apos;ve received your booking enquiry</p>
+      </div>
+      <div style="background:#f9fafb;padding:24px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
+        <p style="margin:0 0 16px">Hi ${data.name},</p>
+        <p style="margin:0 0 16px">
+          Thanks for reaching out — we&apos;ve received your booking enquiry and our team will be in
+          touch shortly to confirm availability and pricing. This isn&apos;t a confirmed booking yet.
+        </p>
+        <div style="background:#dbeafe;border-radius:6px;padding:16px;margin-bottom:16px">
+          <p style="margin:0 0 8px;font-weight:bold;color:#1e40af">Your Enquiry</p>
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            ${rows
+              .filter(([, value]) => value)
+              .map(
+                ([label, value]) => `
+              <tr>
+                <td style="padding:3px 0;color:#6b7280;width:160px">${label}</td>
+                <td style="font-weight:bold">${value}</td>
+              </tr>`
+              )
+              .join("")}
+          </table>
+        </div>
+        <p style="font-size:13px;color:#6b7280;margin:0">
+          If anything above isn&apos;t right, just reply to this email and let us know.
+        </p>
+      </div>
+      <div style="background:#f3f4f6;padding:16px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;text-align:center">
+        <p style="margin:0;font-size:11px;color:#9ca3af">WayZo Vehicle Rentals &bull; This is an automated message</p>
+      </div>
+    </div>
+  `
+}
+
 export async function submitContact(data: {
   name: string
   email: string
@@ -123,5 +184,18 @@ export async function submitBookingEnquiry(data: {
   })
 
   if (error) return { error: "We couldn't send your enquiry. Please try again shortly." }
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: data.email,
+      replyTo: toEmail,
+      subject: "We've received your booking enquiry — WayZo Vehicle Rentals",
+      html: customerAckEmail(data),
+    })
+  } catch {
+    // Don't fail the submission if the customer acknowledgement email doesn't send
+  }
+
   return {}
 }
