@@ -157,7 +157,7 @@ export function AppSidebar({ user }: { user?: Session["user"] }) {
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-semibold text-sidebar-foreground">WayZo</p>
-            <p className="text-xs text-sidebar-foreground/60">Vehicle Rentals</p>
+            <p className="text-xs text-sidebar-foreground/60">Rentals</p>
           </div>
         </Link>
       </SidebarHeader>

@@ -269,7 +269,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
         <View style={s.header}>
           <View>
             <Text style={s.brand}>WayZo</Text>
-            <Text style={s.brandSub}>Vehicle Rentals</Text>
+            <Text style={s.brandSub}>Rentals</Text>
             <Text style={s.brandLegal}>WAYZO PTY LTD &middot; ABN 99 700 912 698</Text>
           </View>
           <View>
@@ -378,7 +378,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
         <View style={s.header}>
           <View>
             <Text style={s.brand}>WayZo</Text>
-            <Text style={s.brandSub}>Vehicle Rentals</Text>
+            <Text style={s.brandSub}>Rentals</Text>
             <Text style={s.brandLegal}>WAYZO PTY LTD &middot; ABN 99 700 912 698</Text>
           </View>
           <View>
