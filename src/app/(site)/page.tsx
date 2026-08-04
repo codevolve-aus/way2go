@@ -65,7 +65,7 @@ export default async function HomePage() {
               Send a Booking Enquiry
               <ArrowRight className="ml-1" />
             </Button>
-            <Button size="lg" variant="outline" render={<Link href="/gallery" />}>
+            <Button size="lg" variant="outline" render={<Link href="/our-fleet" />}>
               View Our Fleet
             </Button>
           </div>
