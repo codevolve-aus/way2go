@@ -10,21 +10,21 @@ export const metadata: Metadata = {
 
 async function getFormOptions() {
   try {
-    const [categories, locations] = await Promise.all([
-      db.vehicleCategory.findMany({
-        where: { vehicles: { some: {} } },
-        orderBy: { name: "asc" },
+    const [vehicles, locations] = await Promise.all([
+      db.vehicle.findMany({
+        where: { status: "AVAILABLE" },
+        orderBy: [{ make: "asc" }, { model: "asc" }],
       }),
       db.location.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     ])
-    return { categories, locations }
+    return { vehicles, locations }
   } catch {
-    return { categories: [], locations: [] }
+    return { vehicles: [], locations: [] }
   }
 }
 
 export default async function BookingEnquiryPage() {
-  const { categories, locations } = await getFormOptions()
+  const { vehicles, locations } = await getFormOptions()
 
   return (
     <div className="mx-auto max-w-2xl px-4 sm:px-6 py-16">
@@ -38,7 +38,7 @@ export default async function BookingEnquiryPage() {
 
       <Card>
         <CardContent className="pt-6">
-          <BookingEnquiryForm categories={categories} locations={locations} />
+          <BookingEnquiryForm vehicles={vehicles} locations={locations} />
         </CardContent>
       </Card>
     </div>

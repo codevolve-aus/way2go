@@ -116,7 +116,7 @@ function priceEstimateBox(breakdown: PriceBreakdown, discountApplied: boolean) {
 
 function customerAckEmail(data: {
   name: string
-  vehicleCategory: string
+  vehicle: string
   pickupLocation: string
   pickupDate: string
   pickupTime?: string
@@ -125,7 +125,7 @@ function customerAckEmail(data: {
   priceEstimate?: { breakdown: PriceBreakdown; discountApplied: boolean } | null
 }) {
   const rows: [string, string][] = [
-    ["Preferred Vehicle", data.vehicleCategory],
+    ["Vehicle", data.vehicle],
     ["Pickup Location", data.pickupLocation],
     ["Pickup", formatEnquiryDateTime(data.pickupDate, data.pickupTime)],
     ["Return", formatEnquiryDateTime(data.returnDate, data.returnTime)],
@@ -230,7 +230,7 @@ export async function submitBookingEnquiry(data: {
   email: string
   phone: string
   categoryId?: string
-  vehicleCategory: string
+  vehicle: string
   pickupLocation: string
   pickupDate: string
   pickupTime?: string
@@ -296,7 +296,7 @@ export async function submitBookingEnquiry(data: {
       { label: "Name", value: fullName },
       { label: "Email", value: data.email },
       { label: "Phone", value: data.phone },
-      { label: "Preferred Vehicle", value: data.vehicleCategory },
+      { label: "Vehicle", value: data.vehicle },
       { label: "Pickup Location", value: data.pickupLocation },
       { label: "Pickup", value: formatEnquiryDateTime(data.pickupDate, data.pickupTime) },
       { label: "Return", value: formatEnquiryDateTime(data.returnDate, data.returnTime) },

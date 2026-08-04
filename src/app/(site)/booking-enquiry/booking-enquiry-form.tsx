@@ -32,7 +32,7 @@ const emptyForm = {
   lastName: "",
   email: "",
   phone: "",
-  categoryId: "",
+  vehicleId: "",
   pickupLocation: "",
   pickupDate: "",
   pickupTime: "10:00",
@@ -102,25 +102,39 @@ function PriceEstimateCard({ result, isPending }: { result: PriceEstimateResult 
   )
 }
 
+interface VehicleOption {
+  id: string
+  make: string
+  model: string
+  year: number
+  registrationNo: string
+  categoryId: string
+}
+
+function vehicleLabel(v: VehicleOption) {
+  return `${v.year} ${v.make} ${v.model} (${v.registrationNo})`
+}
+
 export function BookingEnquiryForm({
-  categories,
+  vehicles,
   locations,
 }: {
-  categories: { id: string; name: string }[]
+  vehicles: VehicleOption[]
   locations: { id: string; name: string }[]
 }) {
   const [form, setForm] = useState(emptyForm)
   const [isPending, startTransition] = useTransition()
   const [estimate, setEstimate] = useState<PriceEstimateResult | null>(null)
   const [isEstimating, startEstimateTransition] = useTransition()
-  const canEstimate = Boolean(form.categoryId && form.pickupDate && form.returnDate)
+  const selectedVehicle = vehicles.find((v) => v.id === form.vehicleId)
+  const canEstimate = Boolean(selectedVehicle && form.pickupDate && form.returnDate)
 
   useEffect(() => {
-    if (!canEstimate) return
+    if (!canEstimate || !selectedVehicle) return
     const handle = setTimeout(() => {
       startEstimateTransition(async () => {
         const result = await getPriceEstimate({
-          categoryId: form.categoryId,
+          categoryId: selectedVehicle.categoryId,
           pickupDate: form.pickupDate,
           pickupTime: form.pickupTime,
           returnDate: form.returnDate,
@@ -133,7 +147,7 @@ export function BookingEnquiryForm({
     return () => clearTimeout(handle)
   }, [
     canEstimate,
-    form.categoryId,
+    selectedVehicle,
     form.pickupDate,
     form.pickupTime,
     form.returnDate,
@@ -151,6 +165,10 @@ export function BookingEnquiryForm({
       toast.error("Please enter a valid Australian phone number.")
       return
     }
+    if (!selectedVehicle) {
+      toast.error("Please select a vehicle.")
+      return
+    }
     if (form.pickupDate && form.returnDate) {
       const pickupDt = new Date(`${form.pickupDate}T${form.pickupTime}:00`)
       const returnDt = new Date(`${form.returnDate}T${form.returnTime}:00`)
@@ -160,14 +178,13 @@ export function BookingEnquiryForm({
       }
     }
     startTransition(async () => {
-      const categoryName = categories.find((c) => c.id === form.categoryId)?.name ?? ""
       const { error } = await submitBookingEnquiry({
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
         phone: form.phone,
-        categoryId: form.categoryId,
-        vehicleCategory: categoryName,
+        categoryId: selectedVehicle.categoryId,
+        vehicle: vehicleLabel(selectedVehicle),
         pickupLocation: form.pickupLocation,
         pickupDate: form.pickupDate,
         pickupTime: form.pickupTime,
@@ -234,19 +251,21 @@ export function BookingEnquiryForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="enquiry-category">Preferred Vehicle</Label>
+          <Label htmlFor="enquiry-vehicle">
+            Select Vehicle<span className="text-destructive ml-0.5">*</span>
+          </Label>
           <Select
-            items={categories.map((c) => ({ value: c.id, label: c.name }))}
-            value={form.categoryId}
-            onValueChange={(v) => setForm({ ...form, categoryId: v ?? "" })}
+            items={vehicles.map((v) => ({ value: v.id, label: vehicleLabel(v) }))}
+            value={form.vehicleId}
+            onValueChange={(v) => setForm({ ...form, vehicleId: v ?? "" })}
           >
-            <SelectTrigger id="enquiry-category" className="w-full">
-              <SelectValue placeholder="Any category" />
+            <SelectTrigger id="enquiry-vehicle" className="w-full">
+              <SelectValue placeholder="Select a vehicle" />
             </SelectTrigger>
             <SelectContent>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
+              {vehicles.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {vehicleLabel(v)}
                 </SelectItem>
               ))}
             </SelectContent>
