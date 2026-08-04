@@ -2,6 +2,7 @@
 
 import { Resend } from "resend"
 import { db } from "@/lib/db"
+import { isValidAustralianPhone } from "@/lib/phone"
 
 const fromEmail = process.env.RESEND_FROM_EMAIL ?? "WayZo Rentals <noreply@wayzo.com.au>"
 // Customer-facing enquiries go to CONTACT_EMAIL; ADMIN_EMAIL is reserved for
@@ -153,6 +154,9 @@ export async function submitBookingEnquiry(data: {
 }) {
   if (!data.name.trim() || !data.email.trim() || !data.phone.trim()) {
     return { error: "Please fill in your name, email and phone number." }
+  }
+  if (!isValidAustralianPhone(data.phone)) {
+    return { error: "Please enter a valid Australian phone number." }
   }
   if (!toEmail) {
     return { error: "This form isn't configured yet — please call one of our branches instead." }

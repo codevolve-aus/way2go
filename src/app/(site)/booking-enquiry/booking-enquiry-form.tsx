@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select"
 import { submitBookingEnquiry } from "../actions"
 import { getPriceEstimate, type PriceEstimateResult } from "@/lib/pricing-actions"
+import { isValidAustralianPhone } from "@/lib/phone"
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-AU", {
@@ -129,6 +130,10 @@ export function BookingEnquiryForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!isValidAustralianPhone(form.phone)) {
+      toast.error("Please enter a valid Australian phone number.")
+      return
+    }
     startTransition(async () => {
       const categoryName = categories.find((c) => c.id === form.categoryId)?.name ?? ""
       const { error } = await submitBookingEnquiry({
