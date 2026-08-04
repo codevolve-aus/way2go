@@ -70,6 +70,22 @@ type MaintenanceRecord = {
   vendor: string
 }
 
+const MAINTENANCE_TYPE_LABELS: Record<string, string> = {
+  SERVICE: "Service",
+  REGISTRATION: "Registration",
+  TYRE_REPLACEMENT: "Tyre Replacement",
+  INSPECTION: "Inspection",
+  BRAKE_SERVICE: "Brake Service",
+  OIL_CHANGE: "Oil Change",
+}
+
+const MAINTENANCE_STATUS_LABELS: Record<string, string> = {
+  SCHEDULED: "Scheduled",
+  OVERDUE: "Overdue",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+}
+
 function typeBadge(type: string) {
   const styles: Record<string, string> = {
     SERVICE: "bg-blue-500/15 text-blue-400 border-blue-500/30",
@@ -79,19 +95,11 @@ function typeBadge(type: string) {
     BRAKE_SERVICE: "bg-red-500/15 text-red-400 border-red-500/30",
     OIL_CHANGE: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
   }
-  const labels: Record<string, string> = {
-    SERVICE: "Service",
-    REGISTRATION: "Registration",
-    TYRE_REPLACEMENT: "Tyre Replacement",
-    INSPECTION: "Inspection",
-    BRAKE_SERVICE: "Brake Service",
-    OIL_CHANGE: "Oil Change",
-  }
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${styles[type] ?? "bg-muted text-muted-foreground border-border"}`}
     >
-      {labels[type] ?? type}
+      {MAINTENANCE_TYPE_LABELS[type] ?? type}
     </span>
   )
 }
@@ -103,17 +111,11 @@ function statusBadge(status: string) {
     IN_PROGRESS: "bg-orange-500/15 text-orange-400 border-orange-500/30",
     COMPLETED: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   }
-  const labels: Record<string, string> = {
-    SCHEDULED: "Scheduled",
-    OVERDUE: "Overdue",
-    IN_PROGRESS: "In Progress",
-    COMPLETED: "Completed",
-  }
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-muted text-muted-foreground border-border"}`}
     >
-      {labels[status] ?? status}
+      {MAINTENANCE_STATUS_LABELS[status] ?? status}
     </span>
   )
 }
@@ -310,7 +312,11 @@ export function MaintenanceView({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? "all")}>
+        <Select
+          items={[{ value: "all", label: "All Types" }, ...Object.entries(MAINTENANCE_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
+          value={typeFilter}
+          onValueChange={(v) => setTypeFilter(v ?? "all")}
+        >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
@@ -324,7 +330,11 @@ export function MaintenanceView({
             <SelectItem value="OIL_CHANGE">Oil Change</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all")}>
+        <Select
+          items={[{ value: "all", label: "All Statuses" }, ...Object.entries(MAINTENANCE_STATUS_LABELS).map(([value, label]) => ({ value, label }))]}
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v ?? "all")}
+        >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -447,6 +457,7 @@ export function MaintenanceView({
             <div className="space-y-1.5">
               <Label>Type</Label>
               <Select
+                items={Object.entries(MAINTENANCE_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
                 value={form.type}
                 onValueChange={(v) => setForm((f) => ({ ...f, type: (v ?? "SERVICE") as MaintenanceType }))}
               >

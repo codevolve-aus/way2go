@@ -247,7 +247,11 @@ export function PaymentsView({ payments, bookings }: PaymentsViewProps) {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Select value={methodFilter} onValueChange={(v) => setMethodFilter(v ?? "all")}>
+            <Select
+              items={[{ value: "all", label: "All Methods" }, ...Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => ({ value, label }))]}
+              value={methodFilter}
+              onValueChange={(v) => setMethodFilter(v ?? "all")}
+            >
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Method" />
               </SelectTrigger>
@@ -259,7 +263,11 @@ export function PaymentsView({ payments, bookings }: PaymentsViewProps) {
                 <SelectItem value="ONLINE">Online</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? "all")}>
+            <Select
+              items={[{ value: "all", label: "All Types" }, ...Object.entries(PAYMENT_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
+              value={typeFilter}
+              onValueChange={(v) => setTypeFilter(v ?? "all")}
+            >
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -376,6 +384,7 @@ export function PaymentsView({ payments, bookings }: PaymentsViewProps) {
             <div className="space-y-1.5">
               <Label>Payment Type</Label>
               <Select
+                items={Object.entries(PAYMENT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
                 value={form.type}
                 onValueChange={(v) =>
                   setForm((f) => ({ ...f, type: (v ?? "RENTAL_FEE") as PaymentType }))
@@ -398,6 +407,7 @@ export function PaymentsView({ payments, bookings }: PaymentsViewProps) {
             <div className="space-y-1.5">
               <Label>Payment Method</Label>
               <Select
+                items={Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => ({ value, label }))}
                 value={form.method}
                 onValueChange={(v) =>
                   setForm((f) => ({ ...f, method: (v ?? "CARD") as PaymentMethod }))

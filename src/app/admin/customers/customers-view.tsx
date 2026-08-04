@@ -394,7 +394,15 @@ export function CustomersView({ customers }: CustomersViewProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all-status")}>
+        <Select
+          items={[
+            { value: "all-status", label: "All Status" },
+            { value: "active", label: "Active" },
+            { value: "blacklisted", label: "Blacklisted" },
+          ]}
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v ?? "all-status")}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>

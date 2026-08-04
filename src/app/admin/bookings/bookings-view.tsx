@@ -669,7 +669,18 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all-status")}>
+        <Select
+          items={[
+            { value: "all-status", label: "All Statuses" },
+            { value: "pending", label: "Pending" },
+            { value: "confirmed", label: "Confirmed" },
+            { value: "active", label: "Active" },
+            { value: "completed", label: "Completed" },
+            { value: "cancelled", label: "Cancelled" },
+          ]}
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v ?? "all-status")}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -803,6 +814,7 @@ export function BookingsView({ bookings, customers, vehicles }: BookingsViewProp
             <div className="space-y-1.5">
               <Label>Source</Label>
               <Select
+                items={Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))}
                 value={form.source}
                 onValueChange={(v) =>
                   setForm((f) => ({ ...f, source: (v ?? "WALK_IN") as BookingSource }))

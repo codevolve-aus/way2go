@@ -171,7 +171,18 @@ export function FleetTable() {
             className="pl-8"
           />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "ALL")}>
+        <Select
+          items={[
+            { value: "ALL", label: "All Statuses" },
+            { value: "AVAILABLE", label: "Available" },
+            { value: "BOOKED", label: "Booked" },
+            { value: "MAINTENANCE", label: "Maintenance" },
+            { value: "DAMAGED", label: "Damaged" },
+            { value: "RETIRED", label: "Retired" },
+          ]}
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v ?? "ALL")}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -184,7 +195,11 @@ export function FleetTable() {
             <SelectItem value="RETIRED">Retired</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v ?? "ALL")}>
+        <Select
+          items={[{ value: "ALL", label: "All Categories" }, ...categories.map((cat) => ({ value: cat, label: cat }))]}
+          value={categoryFilter}
+          onValueChange={(v) => setCategoryFilter(v ?? "ALL")}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>

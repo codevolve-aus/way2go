@@ -225,7 +225,11 @@ export function DamageView({ reports, vehicles }: DamageViewProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all")}>
+        <Select
+          items={[{ value: "all", label: "All Statuses" }, ...Object.entries(statusLabels).map(([value, label]) => ({ value, label }))]}
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v ?? "all")}
+        >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -239,7 +243,11 @@ export function DamageView({ reports, vehicles }: DamageViewProps) {
             <SelectItem value="RESOLVED">Resolved</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={faultFilter} onValueChange={(v) => setFaultFilter(v ?? "all")}>
+        <Select
+          items={[{ value: "all", label: "All Fault Types" }, ...Object.entries(faultLabels).map(([value, label]) => ({ value, label }))]}
+          value={faultFilter}
+          onValueChange={(v) => setFaultFilter(v ?? "all")}
+        >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Fault Type" />
           </SelectTrigger>
@@ -395,6 +403,7 @@ export function DamageView({ reports, vehicles }: DamageViewProps) {
             <div className="space-y-1.5">
               <Label>Fault Type</Label>
               <Select
+                items={Object.entries(faultLabels).map(([value, label]) => ({ value, label }))}
                 value={form.faultType}
                 onValueChange={(v) =>
                   setForm((f) => ({ ...f, faultType: (v ?? "") as FaultType | "" }))

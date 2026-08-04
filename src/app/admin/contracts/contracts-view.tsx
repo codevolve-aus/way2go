@@ -318,7 +318,18 @@ export function ContractsView({ contracts }: ContractsViewProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all")}>
+        <Select
+          items={[
+            { value: "all", label: "All Statuses" },
+            { value: "draft", label: "Draft" },
+            { value: "signed", label: "Signed" },
+            { value: "active", label: "Active" },
+            { value: "closed", label: "Closed" },
+            { value: "disputed", label: "Disputed" },
+          ]}
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v ?? "all")}
+        >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>

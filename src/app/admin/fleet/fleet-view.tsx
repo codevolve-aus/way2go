@@ -386,7 +386,18 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
             className="pl-8"
           />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "ALL")}>
+        <Select
+          items={[
+            { value: "ALL", label: "All Statuses" },
+            { value: "AVAILABLE", label: "Available" },
+            { value: "BOOKED", label: "Booked" },
+            { value: "MAINTENANCE", label: "Maintenance" },
+            { value: "DAMAGED", label: "Damaged" },
+            { value: "RETIRED", label: "Retired" },
+          ]}
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v ?? "ALL")}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -399,7 +410,11 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
             <SelectItem value="RETIRED">Retired</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v ?? "ALL")}>
+        <Select
+          items={[{ value: "ALL", label: "All Categories" }, ...categoryNames.map((cat) => ({ value: cat, label: cat }))]}
+          value={categoryFilter}
+          onValueChange={(v) => setCategoryFilter(v ?? "ALL")}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
@@ -572,6 +587,13 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
             <div className="space-y-1.5">
               <Label>Fuel Type</Label>
               <Select
+                items={[
+                  { value: "PETROL", label: "Petrol" },
+                  { value: "DIESEL", label: "Diesel" },
+                  { value: "HYBRID", label: "Hybrid" },
+                  { value: "ELECTRIC", label: "Electric" },
+                  { value: "LPG", label: "LPG" },
+                ]}
                 value={form.fuelType}
                 onValueChange={(v) =>
                   setForm((f) => ({ ...f, fuelType: (v ?? "PETROL") as typeof f.fuelType }))
@@ -592,6 +614,10 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
             <div className="space-y-1.5">
               <Label>Transmission</Label>
               <Select
+                items={[
+                  { value: "AUTOMATIC", label: "Automatic" },
+                  { value: "MANUAL", label: "Manual" },
+                ]}
                 value={form.transmission}
                 onValueChange={(v) =>
                   setForm((f) => ({
