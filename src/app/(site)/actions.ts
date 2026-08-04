@@ -1,6 +1,7 @@
 "use server"
 
 import { Resend } from "resend"
+import { db } from "@/lib/db"
 
 const fromEmail = process.env.RESEND_FROM_EMAIL ?? "WayZo Rentals <noreply@wayzo.com.au>"
 // Customer-facing enquiries go to CONTACT_EMAIL; ADMIN_EMAIL is reserved for
@@ -63,6 +64,21 @@ export async function submitContact(data: {
   return {}
 }
 
+// A returning customer is recognised by email OR phone matching an existing
+// record — either one identifies them, since either could have changed.
+async function findOrCreateCustomer(data: { name: string; email: string; phone: string }) {
+  const email = data.email.trim()
+  const phone = data.phone.trim()
+
+  const existing = await db.customer.findFirst({ where: { OR: [{ email }, { phone }] } })
+  if (existing) return existing
+
+  const [firstName, ...rest] = data.name.trim().split(/\s+/)
+  return db.customer.create({
+    data: { firstName, lastName: rest.join(" "), email, phone },
+  })
+}
+
 export async function submitBookingEnquiry(data: {
   name: string
   email: string
@@ -79,6 +95,12 @@ export async function submitBookingEnquiry(data: {
   }
   if (!toEmail) {
     return { error: "This form isn't configured yet — please call one of our branches instead." }
+  }
+
+  try {
+    await findOrCreateCustomer(data)
+  } catch {
+    // Don't block the enquiry email if the customer record can't be synced
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY)
