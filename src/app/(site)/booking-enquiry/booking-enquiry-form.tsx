@@ -109,10 +109,45 @@ interface VehicleOption {
   year: number
   registrationNo: string
   categoryId: string
+  seats: number
+  transmission: string
+  fuelType: string
+  description: string | null
+  photos: { url: string }[]
 }
 
 function vehicleLabel(v: VehicleOption) {
   return `${v.year} ${v.make} ${v.model} (${v.registrationNo})`
+}
+
+function VehiclePreview({ vehicle }: { vehicle: VehicleOption }) {
+  const photo = vehicle.photos[0]
+  return (
+    <Card className="bg-muted/40 overflow-hidden py-0">
+      <div className="flex gap-3">
+        <div className="relative h-24 w-32 shrink-0 bg-muted">
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo.url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+              No photo
+            </div>
+          )}
+        </div>
+        <CardContent className="flex-1 py-3 pl-0 pr-3 text-sm">
+          <p className="font-medium text-foreground">{vehicleLabel(vehicle)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {vehicle.seats} seats &middot; {vehicle.transmission.toLowerCase()} &middot;{" "}
+            {vehicle.fuelType.toLowerCase()}
+          </p>
+          {vehicle.description && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{vehicle.description}</p>
+          )}
+        </CardContent>
+      </div>
+    </Card>
+  )
 }
 
 export function BookingEnquiryForm({
@@ -290,6 +325,8 @@ export function BookingEnquiryForm({
           </Select>
         </div>
       </div>
+
+      {selectedVehicle && <VehiclePreview vehicle={selectedVehicle} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

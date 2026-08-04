@@ -52,6 +52,7 @@ model Vehicle {
   status         VehicleStatus   @default(AVAILABLE)
   odometer       Float           @default(0)
   notes          String?
+  description    String?         @db.Text
   categoryId     String
   category       VehicleCategory @relation(fields: [categoryId], references: [id])
   photos         VehiclePhoto[]

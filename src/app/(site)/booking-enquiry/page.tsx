@@ -13,6 +13,7 @@ async function getFormOptions() {
     const [vehicles, locations] = await Promise.all([
       db.vehicle.findMany({
         where: { status: "AVAILABLE" },
+        include: { photos: { orderBy: { isPrimary: "desc" }, take: 1 } },
         orderBy: [{ make: "asc" }, { model: "asc" }],
       }),
       db.location.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),

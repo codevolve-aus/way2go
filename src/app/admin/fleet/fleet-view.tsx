@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import {
   MoreHorizontal,
   Pencil,
@@ -12,9 +12,19 @@ import {
   Plus,
   RefreshCw,
   Archive,
+  Star,
+  Upload,
+  ImageOff,
 } from "lucide-react"
 import { toast } from "sonner"
-import type { Vehicle, VehicleCategory, VehicleStatus, FuelType, Transmission } from "@/generated/prisma"
+import type {
+  Vehicle,
+  VehicleCategory,
+  VehiclePhoto,
+  VehicleStatus,
+  FuelType,
+  Transmission,
+} from "@/generated/prisma"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -62,9 +72,17 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 
-import { createVehicle, updateVehicle, updateVehicleStatus, deleteVehicle } from "./actions"
+import {
+  createVehicle,
+  updateVehicle,
+  updateVehicleStatus,
+  deleteVehicle,
+  uploadVehiclePhoto,
+  deleteVehiclePhoto,
+  setPrimaryVehiclePhoto,
+} from "./actions"
 
-type VehicleRow = Vehicle & { category: VehicleCategory }
+type VehicleRow = Vehicle & { category: VehicleCategory; photos: VehiclePhoto[] }
 type CategoryOption = Pick<VehicleCategory, "id" | "name">
 
 interface FleetViewProps {
@@ -97,6 +115,7 @@ type VehicleForm = {
   odometer: string
   vin: string
   notes: string
+  description: string
 }
 
 function VehicleActionsMenu({
@@ -201,6 +220,118 @@ function VehicleActionsMenu({
   )
 }
 
+function VehiclePhotoManager({ vehicleId, photos }: { vehicleId: string; photos: VehiclePhoto[] }) {
+  const [isUploading, startUpload] = useTransition()
+  const [pendingPhotoId, setPendingPhotoId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append("file", file)
+    startUpload(async () => {
+      try {
+        await uploadVehiclePhoto(vehicleId, formData)
+        toast.success("Photo uploaded")
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to upload photo")
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = ""
+      }
+    })
+  }
+
+  function handleSetPrimary(photoId: string) {
+    setPendingPhotoId(photoId)
+    setPrimaryVehiclePhoto(photoId)
+      .then(() => toast.success("Primary photo updated"))
+      .catch(() => toast.error("Failed to set primary photo"))
+      .finally(() => setPendingPhotoId(null))
+  }
+
+  function handleDelete(photoId: string) {
+    setPendingPhotoId(photoId)
+    deleteVehiclePhoto(photoId)
+      .then(() => toast.success("Photo deleted"))
+      .catch(() => toast.error("Failed to delete photo"))
+      .finally(() => setPendingPhotoId(null))
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label>Photos</Label>
+      {photos.length > 0 ? (
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((photo) => (
+            <div key={photo.id} className="relative group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo.url}
+                alt=""
+                className="h-20 w-full rounded-md object-cover ring-1 ring-border"
+              />
+              {photo.isPrimary && (
+                <span className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                  Primary
+                </span>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center gap-1 rounded-md bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                {!photo.isPrimary && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="h-6 w-6"
+                    disabled={pendingPhotoId === photo.id}
+                    onClick={() => handleSetPrimary(photo.id)}
+                    title="Set as primary"
+                  >
+                    <Star className="h-3 w-3" />
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="destructive"
+                  className="h-6 w-6"
+                  disabled={pendingPhotoId === photo.id}
+                  onClick={() => handleDelete(photo.id)}
+                  title="Delete photo"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+          <ImageOff className="h-4 w-4 shrink-0" />
+          No photos yet — customers will see a placeholder until you add one.
+        </div>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={isUploading}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="h-4 w-4" />
+        {isUploading ? "Uploading…" : "Upload Photo"}
+      </Button>
+    </div>
+  )
+}
+
 const emptyForm: VehicleForm = {
   make: "",
   model: "",
@@ -214,6 +345,7 @@ const emptyForm: VehicleForm = {
   odometer: "0",
   vin: "",
   notes: "",
+  description: "",
 }
 
 export function FleetView({ vehicles, categories }: FleetViewProps) {
@@ -259,6 +391,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
       odometer: String(vehicle.odometer),
       vin: vehicle.vin ?? "",
       notes: vehicle.notes ?? "",
+      description: vehicle.description ?? "",
     })
     setOpen(true)
   }
@@ -297,6 +430,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
       odometer,
       vin: form.vin || undefined,
       notes: form.notes || undefined,
+      description: form.description || undefined,
     }
     startTransition(async () => {
       try {
@@ -457,17 +591,31 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
                 return (
                   <TableRow key={vehicle.id}>
                     <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium text-foreground">
-                          {vehicle.make} {vehicle.model}{" "}
-                          <span className="text-muted-foreground font-normal">{vehicle.year}</span>
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="w-fit font-mono text-[10px] text-muted-foreground border-border"
-                        >
-                          {vehicle.registrationNo}
-                        </Badge>
+                      <div className="flex items-center gap-2.5">
+                        {vehicle.photos[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={vehicle.photos[0].url}
+                            alt=""
+                            className="h-9 w-12 shrink-0 rounded object-cover ring-1 ring-border"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-12 shrink-0 items-center justify-center rounded bg-muted ring-1 ring-border">
+                            <ImageOff className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-medium text-foreground">
+                            {vehicle.make} {vehicle.model}{" "}
+                            <span className="text-muted-foreground font-normal">{vehicle.year}</span>
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="w-fit font-mono text-[10px] text-muted-foreground border-border"
+                          >
+                            {vehicle.registrationNo}
+                          </Badge>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{vehicle.category.name}</TableCell>
@@ -667,6 +815,26 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
               />
             </div>
             <div className="space-y-1.5">
+              <Label>Description / Features (optional)</Label>
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="e.g. Bluetooth, reverse camera, 7 seats, roof racks — shown to customers"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">Visible to customers on the public site.</p>
+            </div>
+            {editingId ? (
+              <VehiclePhotoManager
+                vehicleId={editingId}
+                photos={vehicles.find((v) => v.id === editingId)?.photos ?? []}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Save the vehicle first, then reopen it to add photos.
+              </p>
+            )}
+            <div className="space-y-1.5">
               <Label>Notes (optional)</Label>
               <Textarea
                 value={form.notes}
@@ -674,6 +842,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
                 placeholder="Any additional notes..."
                 rows={3}
               />
+              <p className="text-xs text-muted-foreground">Internal only — not shown to customers.</p>
             </div>
             <SheetFooter className="px-0">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
