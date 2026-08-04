@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import {
   FileText,
   FilePen,
@@ -12,6 +12,11 @@ import {
   Download,
   X,
   MoreHorizontal,
+  CarFront,
+  KeyRound,
+  Upload,
+  Gauge,
+  Fuel,
 } from "lucide-react"
 import { toast } from "sonner"
 import type {
@@ -20,6 +25,7 @@ import type {
   Customer,
   Vehicle,
   ContractStatus,
+  FuelLevel,
 } from "@/generated/prisma"
 
 import {
@@ -38,6 +44,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -64,8 +72,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
-import { voidContract } from "./actions"
+import {
+  voidContract,
+  uploadContractPhoto,
+  recordCollection,
+  recordReturn,
+} from "./actions"
+
+const FUEL_LEVEL_LABELS: Record<FuelLevel, string> = {
+  EMPTY: "Empty",
+  QUARTER: "1/4",
+  HALF: "1/2",
+  THREE_QUARTER: "3/4",
+  FULL: "Full",
+}
 
 type ContractRow = Contract & {
   booking: Booking & { customer: Customer; vehicle: Vehicle }
@@ -108,16 +137,474 @@ function StatusBadge({ status }: { status: ContractStatus }) {
   }
 }
 
+function parsePhotos(json: string | null): string[] {
+  if (!json) return []
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []
+  } catch {
+    return []
+  }
+}
+
+function ContractViewDialog({
+  contract,
+  onOpenChange,
+}: {
+  contract: ContractRow | null
+  onOpenChange: (open: boolean) => void
+}) {
+  const prePhotos = contract ? parsePhotos(contract.preConditionPhotos) : []
+  const postPhotos = contract ? parsePhotos(contract.postConditionPhotos) : []
+
+  return (
+    <Dialog open={contract !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        {contract && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Contract {contract.contractNumber}</DialogTitle>
+              <DialogDescription>
+                {contract.booking.vehicle.make} {contract.booking.vehicle.model} (
+                {contract.booking.vehicle.registrationNo}) &middot;{" "}
+                {contract.booking.customer.firstName} {contract.booking.customer.lastName}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status</span>
+                <StatusBadge status={contract.status} />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Booking #</span>
+                <span className="font-mono text-xs">{contract.booking.bookingNumber}</span>
+              </div>
+
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Collection
+                </p>
+                {contract.pickupOdometer != null ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
+                        {contract.pickupOdometer.toLocaleString()} km
+                      </span>
+                      {contract.preRentalFuelLevel && (
+                        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                          <Fuel className="h-4 w-4" />
+                          {FUEL_LEVEL_LABELS[contract.preRentalFuelLevel]}
+                        </span>
+                      )}
+                    </div>
+                    {contract.preConditionNotes && (
+                      <p className="text-sm text-muted-foreground">{contract.preConditionNotes}</p>
+                    )}
+                    {prePhotos.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2">
+                        {prePhotos.map((url) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={url}
+                            src={url}
+                            alt=""
+                            className="aspect-square rounded-lg object-cover ring-1 ring-foreground/10"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Not yet recorded.</p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <CarFront className="h-3.5 w-3.5" />
+                  Return
+                </p>
+                {contract.returnOdometer != null ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
+                        {contract.returnOdometer.toLocaleString()} km
+                      </span>
+                      {contract.postRentalFuelLevel && (
+                        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                          <Fuel className="h-4 w-4" />
+                          {FUEL_LEVEL_LABELS[contract.postRentalFuelLevel]}
+                        </span>
+                      )}
+                    </div>
+                    {contract.postConditionNotes && (
+                      <p className="text-sm text-muted-foreground">{contract.postConditionNotes}</p>
+                    )}
+                    {postPhotos.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2">
+                        {postPhotos.map((url) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={url}
+                            src={url}
+                            alt=""
+                            className="aspect-square rounded-lg object-cover ring-1 ring-foreground/10"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Not yet recorded.</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ConditionPhotoField({
+  contractId,
+  phase,
+  photoUrls,
+  onChange,
+}: {
+  contractId: string
+  phase: "pre" | "post"
+  photoUrls: string[]
+  onChange: (urls: string[]) => void
+}) {
+  const [isUploading, startUpload] = useTransition()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    startUpload(async () => {
+      try {
+        const uploaded = await Promise.all(
+          files.map((file) => {
+            const formData = new FormData()
+            formData.append("file", file)
+            return uploadContractPhoto(contractId, phase, formData)
+          })
+        )
+        onChange([...photoUrls, ...uploaded])
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to upload photo")
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = ""
+      }
+    })
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label>Photos</Label>
+      {photoUrls.length > 0 && (
+        <div className="grid grid-cols-4 gap-2">
+          {photoUrls.map((url) => (
+            <div
+              key={url}
+              className="group relative aspect-square overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => onChange(photoUrls.filter((u) => u !== url))}
+                className="absolute top-1 right-1 rounded-full bg-background/90 p-1 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={isUploading}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="h-4 w-4" />
+        {isUploading ? "Uploading…" : "Add Photos"}
+      </Button>
+    </div>
+  )
+}
+
+function RecordCollectionDialog({
+  contract,
+  open,
+  onOpenChange,
+}: {
+  contract: ContractRow
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const [odometer, setOdometer] = useState("")
+  const [fuelLevel, setFuelLevel] = useState<FuelLevel | "">("")
+  const [notes, setNotes] = useState("")
+  const [photoUrls, setPhotoUrls] = useState<string[]>([])
+  const [isPending, startTransition] = useTransition()
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!odometer || !fuelLevel) {
+      toast.error("Please enter the odometer reading and fuel level.")
+      return
+    }
+    startTransition(async () => {
+      try {
+        await recordCollection(contract.id, {
+          pickupOdometer: Number(odometer),
+          preRentalFuelLevel: fuelLevel as FuelLevel,
+          preConditionNotes: notes || undefined,
+          photoUrls,
+        })
+        toast.success(`Vehicle collection recorded for ${contract.contractNumber}`)
+        onOpenChange(false)
+      } catch {
+        toast.error("Failed to record collection")
+      }
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Record Vehicle Collection</DialogTitle>
+          <DialogDescription>
+            {contract.booking.vehicle.make} {contract.booking.vehicle.model} (
+            {contract.booking.vehicle.registrationNo}) &middot;{" "}
+            {contract.booking.customer.firstName} {contract.booking.customer.lastName}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="collect-odometer">
+              Odometer Reading (km)<span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Input
+              id="collect-odometer"
+              type="number"
+              min={0}
+              step="1"
+              required
+              value={odometer}
+              onChange={(e) => setOdometer(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="collect-fuel">
+              Fuel Level<span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Select
+              items={Object.entries(FUEL_LEVEL_LABELS).map(([value, label]) => ({ value, label }))}
+              value={fuelLevel}
+              onValueChange={(v) => setFuelLevel((v ?? "") as FuelLevel)}
+            >
+              <SelectTrigger id="collect-fuel" className="w-full">
+                <SelectValue placeholder="Select fuel level" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(FUEL_LEVEL_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <ConditionPhotoField
+            contractId={contract.id}
+            phase="pre"
+            photoUrls={photoUrls}
+            onChange={setPhotoUrls}
+          />
+          <div className="space-y-1.5">
+            <Label htmlFor="collect-notes">Condition Notes</Label>
+            <Textarea
+              id="collect-notes"
+              rows={3}
+              placeholder="Existing scratches, dents, warning lights, etc."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving…" : "Confirm Collection"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function RecordReturnDialog({
+  contract,
+  open,
+  onOpenChange,
+}: {
+  contract: ContractRow
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const [odometer, setOdometer] = useState("")
+  const [fuelLevel, setFuelLevel] = useState<FuelLevel | "">("")
+  const [notes, setNotes] = useState("")
+  const [photoUrls, setPhotoUrls] = useState<string[]>([])
+  const [isPending, startTransition] = useTransition()
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!odometer || !fuelLevel) {
+      toast.error("Please enter the odometer reading and fuel level.")
+      return
+    }
+    const value = Number(odometer)
+    if (contract.pickupOdometer != null && value < contract.pickupOdometer) {
+      toast.error(
+        `Return odometer must be at least ${contract.pickupOdometer.toLocaleString()} km (the pickup reading).`
+      )
+      return
+    }
+    startTransition(async () => {
+      try {
+        await recordReturn(contract.id, {
+          returnOdometer: value,
+          postRentalFuelLevel: fuelLevel as FuelLevel,
+          postConditionNotes: notes || undefined,
+          photoUrls,
+        })
+        toast.success(`Vehicle return recorded for ${contract.contractNumber}`)
+        onOpenChange(false)
+      } catch {
+        toast.error("Failed to record return")
+      }
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Record Vehicle Return</DialogTitle>
+          <DialogDescription>
+            {contract.booking.vehicle.make} {contract.booking.vehicle.model} (
+            {contract.booking.vehicle.registrationNo}) &middot;{" "}
+            {contract.booking.customer.firstName} {contract.booking.customer.lastName}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="return-odometer">
+              Odometer Reading (km)<span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Input
+              id="return-odometer"
+              type="number"
+              min={contract.pickupOdometer ?? 0}
+              step="1"
+              required
+              value={odometer}
+              onChange={(e) => setOdometer(e.target.value)}
+            />
+            {contract.pickupOdometer != null && (
+              <p className="text-xs text-muted-foreground">
+                Pickup reading was {contract.pickupOdometer.toLocaleString()} km
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="return-fuel">
+              Fuel Level<span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Select
+              items={Object.entries(FUEL_LEVEL_LABELS).map(([value, label]) => ({ value, label }))}
+              value={fuelLevel}
+              onValueChange={(v) => setFuelLevel((v ?? "") as FuelLevel)}
+            >
+              <SelectTrigger id="return-fuel" className="w-full">
+                <SelectValue placeholder="Select fuel level" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(FUEL_LEVEL_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <ConditionPhotoField
+            contractId={contract.id}
+            phase="post"
+            photoUrls={photoUrls}
+            onChange={setPhotoUrls}
+          />
+          <div className="space-y-1.5">
+            <Label htmlFor="return-notes">Condition Notes</Label>
+            <Textarea
+              id="return-notes"
+              rows={3}
+              placeholder="New damage, cleanliness, missing items, etc."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving…" : "Confirm Return"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function ContractActionsMenu({
   contract,
   isPending,
   onVoid,
+  onView,
 }: {
   contract: ContractRow
   isPending: boolean
   onVoid: () => void
+  onView: () => void
 }) {
   const [voidOpen, setVoidOpen] = useState(false)
+  const [collectionOpen, setCollectionOpen] = useState(false)
+  const [collectionKey, setCollectionKey] = useState(0)
+  const [returnOpen, setReturnOpen] = useState(false)
+  const [returnKey, setReturnKey] = useState(0)
 
   return (
     <>
@@ -131,9 +618,7 @@ function ContractActionsMenu({
           }
         />
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={() => toast.info(`Viewing contract ${contract.contractNumber}`)}
-          >
+          <DropdownMenuItem onClick={onView}>
             <Eye className="h-4 w-4" />
             View
           </DropdownMenuItem>
@@ -141,6 +626,38 @@ function ContractActionsMenu({
             <Download className="h-4 w-4" />
             Download PDF
           </DropdownMenuItem>
+          {(contract.status === "DRAFT" || contract.status === "SIGNED") && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() =>
+                  setTimeout(() => {
+                    setCollectionKey((k) => k + 1)
+                    setCollectionOpen(true)
+                  }, 0)
+                }
+              >
+                <KeyRound className="h-4 w-4" />
+                Record Collection
+              </DropdownMenuItem>
+            </>
+          )}
+          {contract.status === "ACTIVE" && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() =>
+                  setTimeout(() => {
+                    setReturnKey((k) => k + 1)
+                    setReturnOpen(true)
+                  }, 0)
+                }
+              >
+                <CarFront className="h-4 w-4" />
+                Record Return
+              </DropdownMenuItem>
+            </>
+          )}
           {contract.status !== "CLOSED" && (
             <>
               <DropdownMenuSeparator />
@@ -155,6 +672,19 @@ function ContractActionsMenu({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <RecordCollectionDialog
+        key={collectionKey}
+        contract={contract}
+        open={collectionOpen}
+        onOpenChange={setCollectionOpen}
+      />
+      <RecordReturnDialog
+        key={returnKey}
+        contract={contract}
+        open={returnOpen}
+        onOpenChange={setReturnOpen}
+      />
 
       <AlertDialog open={voidOpen} onOpenChange={setVoidOpen}>
         <AlertDialogContent>
@@ -188,6 +718,7 @@ export function ContractsView({ contracts }: ContractsViewProps) {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isPending, startTransition] = useTransition()
+  const [viewContract, setViewContract] = useState<ContractRow | null>(null)
 
   const draftCount = contracts.filter((c) => c.status === "DRAFT").length
   const activeCount = contracts.filter((c) => c.status === "ACTIVE").length
@@ -419,6 +950,7 @@ export function ContractsView({ contracts }: ContractsViewProps) {
                           contract={contract}
                           isPending={isPending}
                           onVoid={() => handleVoid(contract.id, contract.contractNumber)}
+                          onView={() => setViewContract(contract)}
                         />
                       </TableCell>
                     </TableRow>
@@ -429,6 +961,11 @@ export function ContractsView({ contracts }: ContractsViewProps) {
           </Table>
         </CardContent>
       </Card>
+
+      <ContractViewDialog
+        contract={viewContract}
+        onOpenChange={(open) => { if (!open) setViewContract(null) }}
+      />
     </div>
   )
 }

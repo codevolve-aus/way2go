@@ -220,6 +220,8 @@ model Contract {
   postConditionNotes  String?
   preConditionPhotos  String?
   postConditionPhotos String?
+  pickupOdometer      Float?
+  returnOdometer      Float?
   totalAmount         Float
   depositAmount       Float
   depositPaid         Float          @default(0)
