@@ -3,7 +3,9 @@
 import { Resend } from "resend"
 
 const fromEmail = process.env.RESEND_FROM_EMAIL ?? "WayZo Rentals <noreply@wayzo.com.au>"
-const toEmail = process.env.ADMIN_EMAIL
+// Customer-facing enquiries go to CONTACT_EMAIL; ADMIN_EMAIL is reserved for
+// the auth admin auto-approval check in src/auth.ts and must stay untouched.
+const toEmail = process.env.CONTACT_EMAIL ?? process.env.ADMIN_EMAIL
 
 function wrapEmail(title: string, rows: { label: string; value: string }[]) {
   return `
