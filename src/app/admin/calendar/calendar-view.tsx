@@ -164,6 +164,109 @@ function Legend() {
   )
 }
 
+// ── Month grid ────────────────────────────────────────────────────────────
+
+const MONTHS_SHOWN = 3
+
+function MonthGrid({
+  year,
+  month,
+  vehicles,
+  bookings,
+  maintenance,
+  blocks,
+  now,
+}: {
+  year: number
+  month: number
+  vehicles: VehicleRow[]
+  bookings: BookingEvent[]
+  maintenance: MaintenanceEvent[]
+  blocks: BlockEvent[]
+  now: Date
+}) {
+  const daysInMonth = getDaysInMonth(year, month)
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("en-AU", {
+    month: "long",
+    year: "numeric",
+  })
+
+  const todayY = now.getFullYear()
+  const todayM = now.getMonth()
+  const todayD = now.getDate()
+  const isCurrentMonth = year === todayY && month === todayM
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <h2 className="px-4 pt-4 pb-2 text-sm font-semibold text-foreground">{monthLabel}</h2>
+        <div className="overflow-x-auto">
+          <div
+            className="grid min-w-max"
+            style={{ gridTemplateColumns: `200px repeat(${daysInMonth}, minmax(30px, 1fr))` }}
+          >
+            {/* Header row */}
+            <div className="sticky left-0 z-10 bg-card border-b border-r border-border px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Vehicle
+            </div>
+            {days.map((day) => (
+              <div
+                key={day}
+                className={cn(
+                  "border-b border-border px-1 py-2 text-center text-xs font-medium",
+                  isCurrentMonth && day === todayD
+                    ? "text-primary font-bold"
+                    : "text-muted-foreground"
+                )}
+              >
+                {day}
+              </div>
+            ))}
+
+            {/* Vehicle rows */}
+            {vehicles.map((vehicle, vIdx) => {
+              const calendar = buildCalendar(
+                vehicle.id, year, month, daysInMonth,
+                bookings, maintenance, blocks
+              )
+              const isLast = vIdx === vehicles.length - 1
+
+              return (
+                <>
+                  <div
+                    key={`label-${vehicle.id}`}
+                    className={cn(
+                      "sticky left-0 z-10 bg-card border-r border-border px-3 py-2",
+                      !isLast && "border-b"
+                    )}
+                  >
+                    <p className="text-sm font-medium text-foreground leading-tight">{vehicle.name}</p>
+                    <p className="text-xs text-muted-foreground">{vehicle.plate}</p>
+                  </div>
+
+                  {days.map((day) => (
+                    <div
+                      key={`${vehicle.id}-${day}`}
+                      className={cn("px-0.5 py-1.5", !isLast && "border-b border-border")}
+                    >
+                      <DayCell
+                        entry={calendar[day]}
+                        isToday={isCurrentMonth && day === todayD}
+                      />
+                    </div>
+                  ))}
+                </>
+              )
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 interface Props {
@@ -178,18 +281,15 @@ export function CalendarView({ vehicles, bookings, maintenance, blocks }: Props)
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
 
-  const daysInMonth = getDaysInMonth(year, month)
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-
-  const monthLabel = new Date(year, month, 1).toLocaleDateString("en-AU", {
-    month: "long",
-    year: "numeric",
-  })
+  const rangeStart = new Date(year, month, 1)
+  const rangeEnd = new Date(year, month + MONTHS_SHOWN - 1, 1)
+  const rangeLabel =
+    rangeStart.toLocaleDateString("en-AU", { month: "long", year: "numeric" }) +
+    " – " +
+    rangeEnd.toLocaleDateString("en-AU", { month: "long", year: "numeric" })
 
   const todayY = now.getFullYear()
   const todayM = now.getMonth()
-  const todayD = now.getDate()
-  const isCurrentMonth = year === todayY && month === todayM
 
   function prevMonth() {
     if (month === 0) { setMonth(11); setYear((y) => y - 1) }
@@ -207,7 +307,9 @@ export function CalendarView({ vehicles, bookings, maintenance, blocks }: Props)
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Availability Calendar</h1>
-          <p className="text-sm text-muted-foreground mt-1">Fleet availability at a glance</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Fleet availability at a glance — next {MONTHS_SHOWN} months
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -216,8 +318,8 @@ export function CalendarView({ vehicles, bookings, maintenance, blocks }: Props)
             <Button variant="ghost" size="icon" onClick={prevMonth} aria-label="Previous month">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-[140px] text-center text-sm font-medium px-2">
-              {monthLabel}
+            <span className="min-w-[220px] text-center text-sm font-medium px-2">
+              {rangeLabel}
             </span>
             <Button variant="ghost" size="icon" onClick={nextMonth} aria-label="Next month">
               <ChevronRight className="h-4 w-4" />
@@ -235,68 +337,23 @@ export function CalendarView({ vehicles, bookings, maintenance, blocks }: Props)
           No vehicles in fleet. Add vehicles first.
         </div>
       ) : (
-        <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <div
-              className="grid min-w-max"
-              style={{ gridTemplateColumns: `200px repeat(${daysInMonth}, minmax(30px, 1fr))` }}
-            >
-              {/* Header row */}
-              <div className="sticky left-0 z-10 bg-card border-b border-r border-border px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Vehicle
-              </div>
-              {days.map((day) => (
-                <div
-                  key={day}
-                  className={cn(
-                    "border-b border-border px-1 py-2 text-center text-xs font-medium",
-                    isCurrentMonth && day === todayD
-                      ? "text-primary font-bold"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {day}
-                </div>
-              ))}
-
-              {/* Vehicle rows */}
-              {vehicles.map((vehicle, vIdx) => {
-                const calendar = buildCalendar(
-                  vehicle.id, year, month, daysInMonth,
-                  bookings, maintenance, blocks
-                )
-                const isLast = vIdx === vehicles.length - 1
-
-                return (
-                  <>
-                    <div
-                      key={`label-${vehicle.id}`}
-                      className={cn(
-                        "sticky left-0 z-10 bg-card border-r border-border px-3 py-2",
-                        !isLast && "border-b"
-                      )}
-                    >
-                      <p className="text-sm font-medium text-foreground leading-tight">{vehicle.name}</p>
-                      <p className="text-xs text-muted-foreground">{vehicle.plate}</p>
-                    </div>
-
-                    {days.map((day) => (
-                      <div
-                        key={`${vehicle.id}-${day}`}
-                        className={cn("px-0.5 py-1.5", !isLast && "border-b border-border")}
-                      >
-                        <DayCell
-                          entry={calendar[day]}
-                          isToday={isCurrentMonth && day === todayD}
-                        />
-                      </div>
-                    ))}
-                  </>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-4">
+          {Array.from({ length: MONTHS_SHOWN }, (_, i) => {
+            const d = new Date(year, month + i, 1)
+            return (
+              <MonthGrid
+                key={`${d.getFullYear()}-${d.getMonth()}`}
+                year={d.getFullYear()}
+                month={d.getMonth()}
+                vehicles={vehicles}
+                bookings={bookings}
+                maintenance={maintenance}
+                blocks={blocks}
+                now={now}
+              />
+            )
+          })}
+        </div>
       )}
 
       <Legend />
