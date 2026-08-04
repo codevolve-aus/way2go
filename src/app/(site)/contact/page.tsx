@@ -6,7 +6,7 @@ import { ContactForm } from "./contact-form"
 
 export const metadata: Metadata = {
   title: "Contact Us",
-  description: "Get in touch with WayZo Vehicle Rentals — branch details and a contact form.",
+  description: "Get in touch with WayZo Rentals — branch details and a contact form.",
 }
 
 async function getActiveLocations() {

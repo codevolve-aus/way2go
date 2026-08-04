@@ -237,7 +237,7 @@ const TERMS: { heading: string; body: string }[] = [
   {
     heading: "12. PRIVACY",
     body:
-      "WayZo Vehicle Rentals collects and uses personal information in accordance with the Australian Privacy Act 1988. Information provided in this agreement is used solely for rental administration, insurance, and compliance purposes. Your information will not be shared with third parties except as required by law or for the purposes of processing claims.",
+      "WayZo Rentals collects and uses personal information in accordance with the Australian Privacy Act 1988. Information provided in this agreement is used solely for rental administration, insurance, and compliance purposes. Your information will not be shared with third parties except as required by law or for the purposes of processing claims.",
   },
   {
     heading: "13. GOVERNING LAW",
@@ -368,7 +368,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
 
         {/* Footer */}
         <View style={s.pageNumber}>
-          <Text>WayZo Vehicle Rentals (WAYZO PTY LTD, ABN 99 700 912 698) — Rental Agreement {data.contractNumber}</Text>
+          <Text>WayZo Rentals (WAYZO PTY LTD, ABN 99 700 912 698) — Rental Agreement {data.contractNumber}</Text>
           <Text>Page 1 of 2 — See overleaf for full Terms and Conditions</Text>
         </View>
       </Page>
@@ -428,7 +428,7 @@ export function ContractPDF({ data }: { data: ContractPDFData }) {
         </View>
 
         <View style={s.pageNumber}>
-          <Text>WayZo Vehicle Rentals (WAYZO PTY LTD, ABN 99 700 912 698) — Rental Agreement {data.contractNumber}</Text>
+          <Text>WayZo Rentals (WAYZO PTY LTD, ABN 99 700 912 698) — Rental Agreement {data.contractNumber}</Text>
           <Text>Page 2 of 2</Text>
         </View>
       </Page>

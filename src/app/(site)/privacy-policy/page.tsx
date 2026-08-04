@@ -3,7 +3,7 @@ import { db } from "@/lib/db"
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "How WayZo Vehicle Rentals collects, uses and protects your personal information.",
+  description: "How WayZo Rentals collects, uses and protects your personal information.",
 }
 
 async function getDocument() {

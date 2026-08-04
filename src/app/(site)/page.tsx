@@ -22,7 +22,7 @@ import { selectActiveRate } from "@/lib/rate-lookup";
 export const metadata: Metadata = {
   title: "Home",
   description:
-    "WayZo Vehicle Rentals — economy to luxury vehicle hire across Sydney. Send a booking enquiry and our team will be in touch.",
+    "WayZo Rentals — economy to luxury vehicle hire across Sydney. Send a booking enquiry and our team will be in touch.",
 };
 
 const valueProps = [

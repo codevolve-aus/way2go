@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: { default: "WayZo", template: "%s | WayZo" },
   description:
-    "WayZo Vehicle Rentals — reliable car, SUV and van hire across Sydney. Browse our fleet and send a booking enquiry today.",
+    "WayZo Rentals — reliable car, SUV and van hire across Sydney. Browse our fleet and send a booking enquiry today.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

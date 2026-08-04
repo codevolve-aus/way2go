@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "WayZo Vehicle Rentals",
+    name: "WayZo Rentals",
     short_name: "WayZo",
     description:
-      "WayZo Vehicle Rentals — reliable vehicle hire across Sydney. Browse our fleet and send a booking enquiry.",
+      "WayZo Rentals — reliable vehicle hire across Sydney. Browse our fleet and send a booking enquiry.",
     start_url: "/",
     scope: "/",
     display: "standalone",

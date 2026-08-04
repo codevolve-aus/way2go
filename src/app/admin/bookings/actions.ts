@@ -167,7 +167,7 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
   const htmlBody = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827">
       <div style="background:#1e40af;padding:24px 32px;border-radius:8px 8px 0 0">
-        <h1 style="color:#fff;margin:0;font-size:22px">WayZo Vehicle Rentals</h1>
+        <h1 style="color:#fff;margin:0;font-size:22px">WayZo Rentals</h1>
         <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px">Rental Agreement &amp; Terms and Conditions</p>
       </div>
       <div style="background:#f9fafb;padding:24px 32px;border:1px solid #e5e7eb;border-top:none">
@@ -212,7 +212,7 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
         </p>
       </div>
       <div style="background:#f3f4f6;padding:16px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;text-align:center">
-        <p style="margin:0;font-size:11px;color:#9ca3af">WayZo Vehicle Rentals &bull; This is an automated message</p>
+        <p style="margin:0;font-size:11px;color:#9ca3af">WayZo Rentals &bull; This is an automated message</p>
       </div>
     </div>
   `
@@ -221,7 +221,7 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
   const { error } = await resend.emails.send({
     from: fromEmail,
     to: c.email,
-    subject: `Your Rental Agreement — ${booking.bookingNumber} | WayZo Vehicle Rentals`,
+    subject: `Your Rental Agreement — ${booking.bookingNumber} | WayZo Rentals`,
     html: htmlBody,
     attachments: [
       {

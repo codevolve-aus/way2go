@@ -77,7 +77,7 @@ async function main() {
       sections: [
         {
           heading: "1. Introduction",
-          body: `WAYZO PTY LTD (ABN 99 700 912 698), trading as WayZo Vehicle Rentals ("WayZo", "we", "us", "our") respects your privacy and is committed to handling your personal information responsibly. This Privacy Policy explains what personal information we collect, how we use and disclose it, and how you can access or correct it, in accordance with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).
+          body: `WAYZO PTY LTD (ABN 99 700 912 698), trading as WayZo Rentals ("WayZo", "we", "us", "our") respects your privacy and is committed to handling your personal information responsibly. This Privacy Policy explains what personal information we collect, how we use and disclose it, and how you can access or correct it, in accordance with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).
 
 By making a booking enquiry, contacting us, or otherwise providing us with personal information, you agree to the collection and use of that information as described in this policy.`,
         },
@@ -149,7 +149,7 @@ Any third party we share information with is only provided the information reaso
       sections: [
         {
           heading: "1. Overview & Acceptance",
-          body: `These Terms & Conditions govern your use of the WayZo Vehicle Rentals website operated by WAYZO PTY LTD (ABN 99 700 912 698) ("WayZo", "we", "us", "our"), and any vehicle rental arranged with us. By submitting a Booking Enquiry, Contact form, or entering into a rental with WayZo, you agree to be bound by these terms, along with the specific terms set out in your signed Rental Agreement at the time of collection.`,
+          body: `These Terms & Conditions govern your use of the WayZo Rentals website operated by WAYZO PTY LTD (ABN 99 700 912 698) ("WayZo", "we", "us", "our"), and any vehicle rental arranged with us. By submitting a Booking Enquiry, Contact form, or entering into a rental with WayZo, you agree to be bound by these terms, along with the specific terms set out in your signed Rental Agreement at the time of collection.`,
         },
         {
           heading: "2. Booking Enquiries Are Not Confirmed Bookings",

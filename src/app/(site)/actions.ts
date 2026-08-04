@@ -134,7 +134,7 @@ function customerAckEmail(data: {
   return `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827">
       <div style="background:#1e40af;padding:24px 32px;border-radius:8px 8px 0 0">
-        <h1 style="color:#fff;margin:0;font-size:20px">WayZo Vehicle Rentals</h1>
+        <h1 style="color:#fff;margin:0;font-size:20px">WayZo Rentals</h1>
         <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px">We&apos;ve received your booking enquiry</p>
       </div>
       <div style="background:#f9fafb;padding:24px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
@@ -168,7 +168,7 @@ function customerAckEmail(data: {
         </p>
       </div>
       <div style="background:#f3f4f6;padding:16px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;text-align:center">
-        <p style="margin:0;font-size:11px;color:#9ca3af">WayZo Vehicle Rentals &bull; This is an automated message</p>
+        <p style="margin:0;font-size:11px;color:#9ca3af">WayZo Rentals &bull; This is an automated message</p>
       </div>
     </div>
   `
@@ -313,7 +313,7 @@ export async function submitBookingEnquiry(data: {
       from: fromEmail,
       to: data.email,
       replyTo: toEmail,
-      subject: "We've received your booking enquiry — WayZo Vehicle Rentals",
+      subject: "We've received your booking enquiry — WayZo Rentals",
       html: customerAckEmail({ ...data, name: data.firstName.trim(), priceEstimate }),
     })
   } catch {
