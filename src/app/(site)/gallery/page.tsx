@@ -5,7 +5,7 @@ import { ImageOff } from "lucide-react";
 import { db } from "@/lib/db";
 
 export const metadata: Metadata = {
-  title: "Photo Gallery",
+  title: "Our Fleet",
   description: "Browse the WayZo fleet — economy, SUV, luxury and more.",
 };
 
