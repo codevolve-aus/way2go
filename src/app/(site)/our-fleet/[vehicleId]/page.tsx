@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
-import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, ArrowRight, ImageOff, Users, Fuel, Settings2, Palette } from "lucide-react"
+import { ArrowLeft, ArrowRight, Users, Fuel, Settings2, Palette } from "lucide-react"
 import { db } from "@/lib/db"
 import { Button } from "@/components/ui/button"
 import { selectActiveRate } from "@/lib/rate-lookup"
+import { VehicleGallery } from "./vehicle-gallery"
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-AU", {
@@ -65,7 +65,6 @@ export default async function VehicleDetailPage({
 
   const rate = selectActiveRate(vehicle.category.rates)
   const photos = vehicle.photos
-  const primaryPhoto = photos[0]
   const title = `${vehicle.year} ${vehicle.make} ${vehicle.model}`
 
   const specs = [
@@ -87,35 +86,7 @@ export default async function VehicleDetailPage({
 
       <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start">
         <div>
-          <div className="relative aspect-4/3 sm:aspect-16/9 w-full overflow-hidden rounded-2xl bg-muted ring-1 ring-foreground/10">
-            {primaryPhoto ? (
-              <Image
-                src={primaryPhoto.url}
-                alt={title}
-                fill
-                sizes="(min-width: 1024px) 66vw, 100vw"
-                className="object-cover"
-                priority
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <ImageOff className="h-10 w-10 text-muted-foreground" />
-              </div>
-            )}
-          </div>
-
-          {photos.length > 1 && (
-            <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-5">
-              {photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="relative aspect-square overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10"
-                >
-                  <Image src={photo.url} alt="" fill sizes="120px" className="object-cover" />
-                </div>
-              ))}
-            </div>
-          )}
+          <VehicleGallery photos={photos} title={title} />
 
           <div className="mt-8">
             <p className="text-sm font-medium text-primary">{vehicle.category.name}</p>
