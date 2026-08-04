@@ -81,31 +81,35 @@ export default async function OurFleetPage() {
                       key={vehicle.id}
                       className="group overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10 transition-shadow hover:shadow-lg"
                     >
-                      <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
-                        {photo ? (
-                          <Image
-                            src={photo.url}
-                            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                            fill
-                            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <ImageOff className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
-                        {rate && (
-                          <div className="absolute top-3 right-3 rounded-full bg-background/95 px-3 py-1 text-xs font-semibold text-foreground shadow-sm backdrop-blur">
-                            From {formatCurrency(rate.dailyRate)}/day
-                          </div>
-                        )}
-                      </div>
+                      <Link href={`/our-fleet/${vehicle.id}`} className="block">
+                        <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
+                          {photo ? (
+                            <Image
+                              src={photo.url}
+                              alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                              fill
+                              sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                              className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <ImageOff className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          {rate && (
+                            <div className="absolute top-3 right-3 rounded-full bg-background/95 px-3 py-1 text-xs font-semibold text-foreground shadow-sm backdrop-blur">
+                              From {formatCurrency(rate.dailyRate)}/day
+                            </div>
+                          )}
+                        </div>
+                      </Link>
                       <div className="p-4 space-y-3">
                         <div>
-                          <p className="font-semibold text-foreground">
-                            {vehicle.year} {vehicle.make} {vehicle.model}
-                          </p>
+                          <Link href={`/our-fleet/${vehicle.id}`}>
+                            <p className="font-semibold text-foreground hover:text-primary transition-colors">
+                              {vehicle.year} {vehicle.make} {vehicle.model}
+                            </p>
+                          </Link>
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="inline-flex items-center gap-1">
                               <Users className="h-3.5 w-3.5" />

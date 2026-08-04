@@ -45,6 +45,7 @@ export async function updateVehicle(
   await db.vehicle.update({ where: { id }, data })
   revalidatePath("/admin/fleet")
   revalidatePath("/our-fleet")
+  revalidatePath(`/our-fleet/${id}`)
   revalidatePath("/booking-enquiry")
 }
 
@@ -59,6 +60,7 @@ export async function deleteVehicle(id: string) {
   await db.vehicle.delete({ where: { id } })
   revalidatePath("/admin/fleet")
   revalidatePath("/our-fleet")
+  revalidatePath(`/our-fleet/${id}`)
   revalidatePath("/booking-enquiry")
 }
 
@@ -87,6 +89,7 @@ export async function uploadVehiclePhoto(vehicleId: string, formData: FormData) 
 
   revalidatePath("/admin/fleet")
   revalidatePath("/our-fleet")
+  revalidatePath(`/our-fleet/${vehicleId}`)
   revalidatePath("/booking-enquiry")
 }
 
@@ -102,6 +105,7 @@ export async function deleteVehiclePhoto(photoId: string) {
 
   revalidatePath("/admin/fleet")
   revalidatePath("/our-fleet")
+  revalidatePath(`/our-fleet/${photo.vehicleId}`)
   revalidatePath("/booking-enquiry")
 }
 
@@ -117,5 +121,6 @@ export async function setPrimaryVehiclePhoto(photoId: string) {
 
   revalidatePath("/admin/fleet")
   revalidatePath("/our-fleet")
+  revalidatePath(`/our-fleet/${photo.vehicleId}`)
   revalidatePath("/booking-enquiry")
 }
