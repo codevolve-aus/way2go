@@ -28,7 +28,8 @@ function formatCurrency(amount: number) {
 }
 
 const emptyForm = {
-  name: "",
+  firstName: "",
+  lastName: "",
   email: "",
   phone: "",
   categoryId: "",
@@ -130,6 +131,10 @@ export function BookingEnquiryForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      toast.error("Please enter your first and last name.")
+      return
+    }
     if (!isValidAustralianPhone(form.phone)) {
       toast.error("Please enter a valid Australian phone number.")
       return
@@ -137,7 +142,8 @@ export function BookingEnquiryForm({
     startTransition(async () => {
       const categoryName = categories.find((c) => c.id === form.categoryId)?.name ?? ""
       const { error } = await submitBookingEnquiry({
-        name: form.name,
+        firstName: form.firstName,
+        lastName: form.lastName,
         email: form.email,
         phone: form.phone,
         vehicleCategory: categoryName,
@@ -161,14 +167,26 @@ export function BookingEnquiryForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="enquiry-name">Name</Label>
+          <Label htmlFor="enquiry-first-name">First Name</Label>
           <Input
-            id="enquiry-name"
+            id="enquiry-first-name"
             required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            value={form.firstName}
+            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
           />
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="enquiry-last-name">Last Name</Label>
+          <Input
+            id="enquiry-last-name"
+            required
+            value={form.lastName}
+            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="enquiry-phone">Phone</Label>
           <Input
@@ -179,17 +197,16 @@ export function BookingEnquiryForm({
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
         </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="enquiry-email">Email</Label>
-        <Input
-          id="enquiry-email"
-          type="email"
-          required
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor="enquiry-email">Email</Label>
+          <Input
+            id="enquiry-email"
+            type="email"
+            required
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

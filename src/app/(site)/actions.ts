@@ -128,21 +128,26 @@ export async function submitContact(data: {
 
 // A returning customer is recognised by email OR phone matching an existing
 // record — either one identifies them, since either could have changed.
-async function findOrCreateCustomer(data: { name: string; email: string; phone: string }) {
+async function findOrCreateCustomer(data: {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+}) {
   const email = data.email.trim()
   const phone = data.phone.trim()
 
   const existing = await db.customer.findFirst({ where: { OR: [{ email }, { phone }] } })
   if (existing) return existing
 
-  const [firstName, ...rest] = data.name.trim().split(/\s+/)
   return db.customer.create({
-    data: { firstName, lastName: rest.join(" "), email, phone },
+    data: { firstName: data.firstName.trim(), lastName: data.lastName.trim(), email, phone },
   })
 }
 
 export async function submitBookingEnquiry(data: {
-  name: string
+  firstName: string
+  lastName: string
   email: string
   phone: string
   vehicleCategory: string
@@ -152,8 +157,8 @@ export async function submitBookingEnquiry(data: {
   discountCode?: string
   notes: string
 }) {
-  if (!data.name.trim() || !data.email.trim() || !data.phone.trim()) {
-    return { error: "Please fill in your name, email and phone number." }
+  if (!data.firstName.trim() || !data.lastName.trim() || !data.email.trim() || !data.phone.trim()) {
+    return { error: "Please fill in your first name, last name, email and phone number." }
   }
   if (!isValidAustralianPhone(data.phone)) {
     return { error: "Please enter a valid Australian phone number." }
@@ -161,6 +166,8 @@ export async function submitBookingEnquiry(data: {
   if (!toEmail) {
     return { error: "This form isn't configured yet — please call one of our branches instead." }
   }
+
+  const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`
 
   try {
     await findOrCreateCustomer(data)
@@ -173,9 +180,9 @@ export async function submitBookingEnquiry(data: {
     from: fromEmail,
     to: toEmail,
     replyTo: data.email,
-    subject: `New booking enquiry from ${data.name}`,
+    subject: `New booking enquiry from ${fullName}`,
     html: wrapEmail("New Booking Enquiry", [
-      { label: "Name", value: data.name },
+      { label: "Name", value: fullName },
       { label: "Email", value: data.email },
       { label: "Phone", value: data.phone },
       { label: "Preferred Vehicle", value: data.vehicleCategory },
@@ -195,7 +202,7 @@ export async function submitBookingEnquiry(data: {
       to: data.email,
       replyTo: toEmail,
       subject: "We've received your booking enquiry — WayZo Vehicle Rentals",
-      html: customerAckEmail(data),
+      html: customerAckEmail({ ...data, name: data.firstName.trim() }),
     })
   } catch {
     // Don't fail the submission if the customer acknowledgement email doesn't send
