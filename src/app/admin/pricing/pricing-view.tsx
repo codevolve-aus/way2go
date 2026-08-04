@@ -280,7 +280,11 @@ function PricingPreview({ categories }: { categories: CategoryOption[] }) {
       <CardContent className="flex flex-col gap-4">
         <div className="space-y-1.5">
           <Label>Category</Label>
-          <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? "")}>
+          <Select
+            items={categories.map((c) => ({ value: c.id, label: c.name }))}
+            value={categoryId}
+            onValueChange={(v) => setCategoryId(v ?? "")}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
@@ -847,6 +851,7 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
               <div className="space-y-1.5">
                 <Label>Category</Label>
                 <Select
+                  items={categories.map((cat) => ({ value: cat.id, label: cat.name }))}
                   value={rateForm.categoryId}
                   onValueChange={(v) => setRateForm((f) => ({ ...f, categoryId: v ?? "" }))}
                 >

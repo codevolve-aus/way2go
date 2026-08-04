@@ -553,6 +553,7 @@ export function FleetView({ vehicles, categories }: FleetViewProps) {
             <div className="space-y-1.5">
               <Label>Category</Label>
               <Select
+                items={categories.map((cat) => ({ value: cat.id, label: cat.name }))}
                 value={form.categoryId}
                 onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v ?? "" }))}
               >

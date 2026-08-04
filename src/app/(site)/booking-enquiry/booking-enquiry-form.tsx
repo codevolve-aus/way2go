@@ -214,6 +214,7 @@ export function BookingEnquiryForm({
         <div className="space-y-1.5">
           <Label htmlFor="enquiry-category">Preferred Vehicle</Label>
           <Select
+            items={categories.map((c) => ({ value: c.id, label: c.name }))}
             value={form.categoryId}
             onValueChange={(v) => setForm({ ...form, categoryId: v ?? "" })}
           >

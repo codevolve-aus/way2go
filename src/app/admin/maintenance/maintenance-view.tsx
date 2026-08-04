@@ -425,6 +425,10 @@ export function MaintenanceView({
             <div className="space-y-1.5">
               <Label>Vehicle</Label>
               <Select
+                items={vehicles.map((v) => ({
+                  value: v.id,
+                  label: `${v.make} ${v.model} (${v.registrationNo})`,
+                }))}
                 value={form.vehicleId}
                 onValueChange={(v) => setForm((f) => ({ ...f, vehicleId: v ?? "" }))}
               >
