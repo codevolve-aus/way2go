@@ -17,6 +17,7 @@ import {
   Upload,
   Gauge,
   Fuel,
+  Route,
 } from "lucide-react"
 import { toast } from "sonner"
 import type {
@@ -179,6 +180,18 @@ function ContractViewDialog({
                 <span className="text-muted-foreground">Booking #</span>
                 <span className="font-mono text-xs">{contract.booking.bookingNumber}</span>
               </div>
+
+              {contract.pickupOdometer != null && contract.returnOdometer != null && (
+                <div className="rounded-lg bg-primary/5 ring-1 ring-primary/20 p-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                    <Route className="h-4 w-4 text-primary" />
+                    Total Distance Driven
+                  </span>
+                  <span className="text-lg font-semibold text-foreground">
+                    {(contract.returnOdometer - contract.pickupOdometer).toLocaleString()} km
+                  </span>
+                </div>
+              )}
 
               <div className="rounded-lg border border-border p-3 space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
