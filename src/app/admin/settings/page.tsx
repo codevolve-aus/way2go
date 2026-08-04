@@ -14,6 +14,7 @@ import {
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { UsersTab } from "./users-tab";
+import { PushNotificationsToggle } from "./push-notifications-toggle";
 
 export const metadata = { title: "Settings" };
 
@@ -172,7 +173,19 @@ export default async function SettingsPage() {
         </TabsContent>
 
         {/* Notifications Tab */}
-        <TabsContent value="notifications" className="mt-6">
+        <TabsContent value="notifications" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Push Notifications</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Mobile/desktop reminders sent directly to this device.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PushNotificationsToggle />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Email Notifications</CardTitle>

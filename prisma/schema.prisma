@@ -162,6 +162,7 @@ model Booking {
   extras           BookingExtra[]
   contract         Contract?
   payments         Payment[]
+  pickupReminderSentAt DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 }
@@ -450,6 +451,17 @@ model Setting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ─── Push Notifications ──────────────────────────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userEmail String?
+  createdAt DateTime @default(now())
 }
 
 // ─── Legal Documents ─────────────────────────────────────────────────────────
