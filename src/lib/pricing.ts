@@ -1,6 +1,6 @@
 // Rental pricing engine — Turo-style: cheapest of daily/weekly/monthly proration,
 // plus a configurable per-day-of-week multiplier, peak-period (seasonal/event) surcharge,
-// promo discount, service fee and tax.
+// tiered length-of-stay discount, promo discount, service fee and tax.
 //
 // The day-of-week multiplier scales the per-night rate directly (1.0 = no change,
 // 0.9 = 10% cheaper, 1.15 = 15% pricier), so weekdays can be discounted to drive
@@ -9,6 +9,10 @@
 // top) additively for a given night, mirroring how rental platforms layer a weekly
 // rate calendar with seasonal/event-week surcharges rather than swapping out the
 // whole rate card for short-term demand spikes.
+//
+// The length-of-stay discount is a separate, automatic incentive keyed on total
+// nights booked (e.g. 7+ nights: 10% off) — independent of whatever weekly/monthly
+// rate numbers a rate card happens to have configured.
 
 export interface PeakPeriod {
   id: string
@@ -18,9 +22,20 @@ export interface PeakPeriod {
   surchargePct: number
 }
 
+// A tiered long-stay incentive, independent of whatever weekly/monthly rate
+// card numbers are configured — e.g. "7+ nights: 10% off, 14+ nights: 15%
+// off". Where a stay qualifies for more than one tier, the highest % wins
+// rather than stacking, same rule as overlapping peak periods.
+export interface LengthOfStayDiscountTier {
+  id: string
+  minNights: number
+  discountPct: number
+}
+
 export interface PricingRules {
   dayOfWeekMultiplier: Record<number, number> // keyed 0 = Sunday … 6 = Saturday; 1 = no adjustment
   peakPeriods: PeakPeriod[]
+  lengthOfStayDiscounts: LengthOfStayDiscountTier[]
   serviceFeePct: number
   taxRatePct: number
   minRentalDays: number
@@ -29,6 +44,7 @@ export interface PricingRules {
 export const DEFAULT_PRICING_RULES: PricingRules = {
   dayOfWeekMultiplier: { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1.15, 6: 1.15 }, // 15% premium Friday & Saturday nights
   peakPeriods: [],
+  lengthOfStayDiscounts: [],
   serviceFeePct: 8,
   taxRatePct: 10,
   minRentalDays: 1,
@@ -56,6 +72,8 @@ export interface PriceBreakdown {
   dayOfWeekAdjustment: number // $ from day-of-week multiplier — positive is a surcharge, negative is a discount
   peakSurcharge: number // $ from peak-period surcharge
   rentalSubtotal: number
+  lengthOfStayDiscountPct: number // the qualifying tier's %, 0 if none applied
+  lengthOfStayDiscount: number // $ from the length-of-stay tier
   discountAmount: number
   serviceFee: number
   taxAmount: number
@@ -116,6 +134,13 @@ function nightSurcharges(
   return { dayOfWeekAdjustedNights, peakNights, dayOfWeekDelta, peakPct }
 }
 
+// Highest-qualifying-tier wins, not a stacked sum — same rule as overlapping
+// peak periods, so a 21-night stay against "7+: 10%, 14+: 15%" tiers gets
+// 15%, not 25%.
+function lengthOfStayDiscountPct(nights: number, tiers: LengthOfStayDiscountTier[]): number {
+  return tiers.reduce((max, t) => (nights >= t.minNights ? Math.max(max, t.discountPct) : max), 0)
+}
+
 function cheapestBaseRate(nights: number, rate: RateCardInput): { type: BaseRateType; amount: number } {
   const candidates: { type: BaseRateType; amount: number }[] = [
     { type: "daily", amount: nights * rate.dailyRate },
@@ -156,6 +181,8 @@ export function calculateRentalPrice(input: {
       dayOfWeekAdjustment: 0,
       peakSurcharge: 0,
       rentalSubtotal: 0,
+      lengthOfStayDiscountPct: 0,
+      lengthOfStayDiscount: 0,
       discountAmount: 0,
       serviceFee: 0,
       taxAmount: 0,
@@ -176,14 +203,20 @@ export function calculateRentalPrice(input: {
 
   const rentalSubtotal = baseSubtotal + dayOfWeekAdjustment + peakSurcharge
 
+  // Sibling % off rentalSubtotal, same base as the promo code discount below
+  // rather than compounding off each other — simplest to reason about and
+  // matches how day-of-week/peak already both scale off the same per-night rate.
+  const stayDiscountPct = lengthOfStayDiscountPct(nights, rules.lengthOfStayDiscounts)
+  const lengthOfStayDiscount = rentalSubtotal * (stayDiscountPct / 100)
+
   let discountAmount = 0
   if (discount?.discountPct) {
     discountAmount = rentalSubtotal * (discount.discountPct / 100)
   } else if (discount?.discountAmt) {
-    discountAmount = Math.min(discount.discountAmt, rentalSubtotal)
+    discountAmount = Math.min(discount.discountAmt, rentalSubtotal - lengthOfStayDiscount)
   }
 
-  const afterDiscount = rentalSubtotal - discountAmount
+  const afterDiscount = rentalSubtotal - lengthOfStayDiscount - discountAmount
   const serviceFee = afterDiscount * (rules.serviceFeePct / 100)
   const taxAmount = (afterDiscount + serviceFee) * (rules.taxRatePct / 100)
   const total = afterDiscount + serviceFee + taxAmount
@@ -197,6 +230,8 @@ export function calculateRentalPrice(input: {
     dayOfWeekAdjustment: round2(dayOfWeekAdjustment),
     peakSurcharge: round2(peakSurcharge),
     rentalSubtotal: round2(rentalSubtotal),
+    lengthOfStayDiscountPct: stayDiscountPct,
+    lengthOfStayDiscount: round2(lengthOfStayDiscount),
     discountAmount: round2(discountAmount),
     serviceFee: round2(serviceFee),
     taxAmount: round2(taxAmount),

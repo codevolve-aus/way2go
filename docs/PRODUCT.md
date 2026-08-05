@@ -197,11 +197,17 @@ Layers, applied in order:
    (`PricingRules.peakPeriods`), stacks additively with the day-of-week adjustment on the
    same night; where two peak periods overlap the same night, the higher one applies
    rather than stacking further.
-5. **Discount** — from a `DiscountCode` (% or flat amount, checked for active/expired/
-   usage-limit) applied after the surcharges.
-6. **Service fee %** and **tax %** — applied last, in that order, both configurable
+5. **Length-of-stay discount** — admin-managed tiers keyed on total nights booked
+   (`PricingRules.lengthOfStayDiscounts`, e.g. "7+ nights: 10% off"), independent of
+   whatever weekly/monthly rate numbers happen to be on the rate card. Highest-qualifying
+   tier wins rather than stacking (a 21-night stay against 7+/14+ tiers gets the 14+ %,
+   not both summed). Computed as a % of `rentalSubtotal` (base + day-of-week + peak),
+   as a sibling to the promo discount below rather than compounding with it.
+6. **Discount** — from a `DiscountCode` (% or flat amount, checked for active/expired/
+   usage-limit) applied after the surcharges, alongside the length-of-stay discount.
+7. **Service fee %** and **tax %** — applied last, in that order, both configurable
    globally.
-7. **Minimum rental days** — surfaced as `belowMinimum` on the breakdown rather than
+8. **Minimum rental days** — surfaced as `belowMinimum` on the breakdown rather than
    blocking the estimate; the UI shows a warning, staff still confirm manually.
 
 All of the above (except rate cards, which live on `RentalRate` rows) are stored as one

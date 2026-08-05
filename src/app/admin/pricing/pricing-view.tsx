@@ -56,7 +56,7 @@ import {
   toggleDiscountCode,
 } from "./actions"
 import { updatePricingRules, getPriceEstimate, type PriceEstimateResult } from "@/lib/pricing-actions"
-import type { PricingRules, PeakPeriod } from "@/lib/pricing"
+import type { PricingRules, PeakPeriod, LengthOfStayDiscountTier } from "@/lib/pricing"
 
 type CategoryOption = { id: string; name: string }
 
@@ -366,6 +366,12 @@ function PricingPreview({ categories }: { categories: CategoryOption[] }) {
                 <span>+{formatCurrency(result.breakdown.peakSurcharge)}</span>
               </div>
             )}
+            {result.breakdown.lengthOfStayDiscount > 0 && (
+              <div className="flex justify-between text-green-600 dark:text-green-400">
+                <span>Length-of-stay discount ({result.breakdown.lengthOfStayDiscountPct}%)</span>
+                <span>-{formatCurrency(result.breakdown.lengthOfStayDiscount)}</span>
+              </div>
+            )}
             {result.discountApplied && (
               <div className="flex justify-between text-green-600 dark:text-green-400">
                 <span>Discount</span>
@@ -525,6 +531,32 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
     }))
   }
 
+  function addLengthOfStayTier() {
+    setRulesForm((f) => ({
+      ...f,
+      lengthOfStayDiscounts: [
+        ...f.lengthOfStayDiscounts,
+        { id: crypto.randomUUID(), minNights: 7, discountPct: 10 },
+      ],
+    }))
+  }
+
+  function updateLengthOfStayTier(id: string, patch: Partial<LengthOfStayDiscountTier>) {
+    setRulesForm((f) => ({
+      ...f,
+      lengthOfStayDiscounts: f.lengthOfStayDiscounts.map((t) =>
+        t.id === id ? { ...t, ...patch } : t
+      ),
+    }))
+  }
+
+  function removeLengthOfStayTier(id: string) {
+    setRulesForm((f) => ({
+      ...f,
+      lengthOfStayDiscounts: f.lengthOfStayDiscounts.filter((t) => t.id !== id),
+    }))
+  }
+
   function handleRulesSubmit(e: React.FormEvent) {
     e.preventDefault()
     for (const p of rulesForm.peakPeriods) {
@@ -534,6 +566,12 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
       }
       if (p.endDate < p.startDate) {
         toast.error(`"${p.name}" end date must be on or after its start date`)
+        return
+      }
+    }
+    for (const t of rulesForm.lengthOfStayDiscounts) {
+      if (!t.minNights || t.minNights < 1) {
+        toast.error("Each length-of-stay tier needs a minimum of at least 1 night")
         return
       }
     }
@@ -967,6 +1005,80 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => removePeakPeriod(p.id)}
                             aria-label="Remove peak period"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="border-b border-border pb-4 flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-base font-medium">Length-of-Stay Discounts</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Automatic discount once a stay reaches a minimum number of nights —
+                      independent of any weekly/monthly rate configured on the rate card.
+                      Where a stay qualifies for more than one tier, the highest % applies.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addLengthOfStayTier}>
+                    <Plus className="h-4 w-4" />
+                    Add Tier
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {rulesForm.lengthOfStayDiscounts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">
+                      No length-of-stay tiers configured — longer stays only get cheaper if the
+                      rate card has a weekly/monthly rate set.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {rulesForm.lengthOfStayDiscounts.map((t) => (
+                        <div
+                          key={t.id}
+                          className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end rounded-lg border border-border p-3"
+                        >
+                          <div className="space-y-1">
+                            <Label className="text-xs">Minimum Nights</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={t.minNights}
+                              onChange={(e) =>
+                                updateLengthOfStayTier(t.id, {
+                                  minNights: parseInt(e.target.value, 10) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Discount (%)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              value={t.discountPct}
+                              onChange={(e) =>
+                                updateLengthOfStayTier(t.id, {
+                                  discountPct: parseFloat(e.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => removeLengthOfStayTier(t.id)}
+                            aria-label="Remove length-of-stay tier"
                           >
                             <X className="h-4 w-4" />
                           </Button>

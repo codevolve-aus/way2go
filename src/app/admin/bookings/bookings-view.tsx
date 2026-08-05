@@ -132,6 +132,12 @@ function BookingPriceEstimate({ result, isPending }: { result: PriceEstimateResu
           <span>+{formatCurrency(breakdown.peakSurcharge)}</span>
         </div>
       )}
+      {breakdown.lengthOfStayDiscount > 0 && (
+        <div className="flex justify-between text-green-600 dark:text-green-400">
+          <span>Length-of-stay discount ({breakdown.lengthOfStayDiscountPct}%)</span>
+          <span>-{formatCurrency(breakdown.lengthOfStayDiscount)}</span>
+        </div>
+      )}
       <div className="flex justify-between text-muted-foreground">
         <span>Service fee</span>
         <span>{formatCurrency(breakdown.serviceFee)}</span>

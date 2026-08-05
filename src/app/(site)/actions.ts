@@ -75,6 +75,12 @@ function priceEstimateRows(breakdown: PriceBreakdown, discountApplied: boolean) 
   if (breakdown.peakSurcharge > 0) {
     rows.push({ label: "Peak season surcharge", value: `+${formatCurrency(breakdown.peakSurcharge)}` })
   }
+  if (breakdown.lengthOfStayDiscount > 0) {
+    rows.push({
+      label: `Length-of-stay discount (${breakdown.lengthOfStayDiscountPct}%)`,
+      value: `-${formatCurrency(breakdown.lengthOfStayDiscount)}`,
+    })
+  }
   if (discountApplied && breakdown.discountAmount > 0) {
     rows.push({ label: "Promo discount", value: `-${formatCurrency(breakdown.discountAmount)}` })
   }
@@ -101,6 +107,12 @@ function priceEstimateBox(breakdown: PriceBreakdown, discountApplied: boolean) {
   }
   if (breakdown.peakSurcharge > 0) {
     lines.push({ label: "Peak season surcharge", value: `+${formatCurrency(breakdown.peakSurcharge)}` })
+  }
+  if (breakdown.lengthOfStayDiscount > 0) {
+    lines.push({
+      label: `Length-of-stay discount (${breakdown.lengthOfStayDiscountPct}%)`,
+      value: `-${formatCurrency(breakdown.lengthOfStayDiscount)}`,
+    })
   }
   if (discountApplied && breakdown.discountAmount > 0) {
     lines.push({ label: "Promo discount", value: `-${formatCurrency(breakdown.discountAmount)}` })

@@ -169,6 +169,12 @@ function PriceEstimateCard({ result, isPending }: { result: PriceEstimateResult 
             <span>+{formatCurrency(breakdown.peakSurcharge)}</span>
           </div>
         )}
+        {breakdown.lengthOfStayDiscount > 0 && (
+          <div className="flex justify-between text-green-600 dark:text-green-400">
+            <span>Length-of-stay discount ({breakdown.lengthOfStayDiscountPct}%)</span>
+            <span>-{formatCurrency(breakdown.lengthOfStayDiscount)}</span>
+          </div>
+        )}
         {result.discountApplied && (
           <div className="flex justify-between text-green-600 dark:text-green-400">
             <span>Promo discount</span>
