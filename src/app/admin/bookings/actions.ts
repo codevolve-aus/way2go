@@ -7,6 +7,7 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer"
 import { createElement, type ReactElement } from "react"
 import { Resend } from "resend"
 import { ContractPDF, type ContractPDFData } from "@/lib/contract-pdf"
+import { notifyTeam } from "@/lib/notifications-actions"
 
 async function nextBookingNumber() {
   const year = new Date().getFullYear()
@@ -72,8 +73,21 @@ export async function updateBooking(
 }
 
 export async function updateBookingStatus(id: string, status: BookingStatus) {
-  await db.booking.update({ where: { id }, data: { status } })
+  const booking = await db.booking.update({
+    where: { id },
+    data: { status },
+    include: { customer: true, vehicle: true },
+  })
   revalidatePath("/admin/bookings")
+
+  if (status === "CONFIRMED") {
+    await notifyTeam("bookingConfirmed", `Booking Confirmed — ${booking.bookingNumber}`, [
+      { label: "Booking", value: booking.bookingNumber },
+      { label: "Customer", value: `${booking.customer.firstName} ${booking.customer.lastName}` },
+      { label: "Vehicle", value: `${booking.vehicle.year} ${booking.vehicle.make} ${booking.vehicle.model}` },
+      { label: "Pickup", value: booking.pickupDate.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" }) },
+    ])
+  }
 }
 
 export async function sendContractEmail(bookingId: string): Promise<{ error?: string }> {
@@ -235,5 +249,13 @@ export async function sendContractEmail(bookingId: string): Promise<{ error?: st
 
   revalidatePath("/admin/bookings")
   revalidatePath("/admin/contracts")
+
+  await notifyTeam("contractReady", `Contract Sent — ${contract.contractNumber}`, [
+    { label: "Contract", value: contract.contractNumber },
+    { label: "Booking", value: booking.bookingNumber },
+    { label: "Customer", value: fullName },
+    { label: "Missing fields", value: missingFields.length > 0 ? missingFields.join(", ") : "None" },
+  ])
+
   return {}
 }

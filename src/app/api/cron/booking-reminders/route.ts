@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import webpush from "web-push"
 import { db } from "@/lib/db"
+import { notifyTeam } from "@/lib/notifications-actions"
 
 const REMINDER_WINDOW_HOURS = 36
 
@@ -17,19 +18,11 @@ function getWebPush() {
   return webpush
 }
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization")
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response("Unauthorized", { status: 401 })
-  }
-
+// Push reminders for upcoming pickups (existing behaviour) — unaffected by
+// the notification prefs below, which only gate the team *email* alerts.
+async function sendPickupPushReminders(now: Date, windowEnd: Date) {
   const push = getWebPush()
-  if (!push) {
-    return NextResponse.json({ error: "VAPID keys not configured" }, { status: 500 })
-  }
-
-  const now = new Date()
-  const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_HOURS * 60 * 60 * 1000)
+  if (!push) return { sent: 0, subscriptions: 0, skipped: "VAPID keys not configured" as const }
 
   const bookings = await db.booking.findMany({
     where: {
@@ -40,9 +33,7 @@ export async function GET(request: Request) {
     include: { customer: true, vehicle: true },
   })
 
-  if (bookings.length === 0) {
-    return NextResponse.json({ sent: 0, subscriptions: 0 })
-  }
+  if (bookings.length === 0) return { sent: 0, subscriptions: 0 }
 
   const subscriptions = await db.pushSubscription.findMany()
 
@@ -80,5 +71,90 @@ export async function GET(request: Request) {
     sent++
   }
 
-  return NextResponse.json({ sent, subscriptions: subscriptions.length })
+  return { sent, subscriptions: subscriptions.length }
+}
+
+// Team email alert for active rentals whose return is coming up — gated by
+// the "Return Reminder" toggle in Settings → Notifications.
+async function sendReturnReminders(now: Date, windowEnd: Date) {
+  const bookings = await db.booking.findMany({
+    where: {
+      returnDate: { gte: now, lte: windowEnd },
+      status: "ACTIVE",
+      returnReminderSentAt: null,
+    },
+    include: { customer: true, vehicle: true },
+  })
+
+  let sent = 0
+  for (const booking of bookings) {
+    await notifyTeam("returnReminder", `Return Due Soon — ${booking.bookingNumber}`, [
+      { label: "Booking", value: booking.bookingNumber },
+      { label: "Customer", value: `${booking.customer.firstName} ${booking.customer.lastName}` },
+      { label: "Vehicle", value: `${booking.vehicle.year} ${booking.vehicle.make} ${booking.vehicle.model}` },
+      {
+        label: "Return due",
+        value: booking.returnDate.toLocaleString("en-AU", {
+          dateStyle: "medium",
+          timeStyle: "short",
+          timeZone: "Australia/Sydney",
+        }),
+      },
+    ])
+    await db.booking.update({ where: { id: booking.id }, data: { returnReminderSentAt: now } })
+    sent++
+  }
+
+  return { sent, checked: bookings.length }
+}
+
+// Team email alert for scheduled vehicle maintenance coming up — gated by
+// the "Maintenance Due" toggle in Settings → Notifications.
+async function sendMaintenanceDueReminders(now: Date, windowEnd: Date) {
+  const records = await db.maintenanceRecord.findMany({
+    where: {
+      scheduledDate: { gte: now, lte: windowEnd },
+      status: "SCHEDULED",
+      dueReminderSentAt: null,
+    },
+    include: { vehicle: true },
+  })
+
+  let sent = 0
+  for (const record of records) {
+    await notifyTeam("maintenanceDue", `Maintenance Due Soon — ${record.vehicle.make} ${record.vehicle.model}`, [
+      { label: "Vehicle", value: `${record.vehicle.year} ${record.vehicle.make} ${record.vehicle.model}` },
+      { label: "Registration", value: record.vehicle.registrationNo },
+      { label: "Type", value: record.type },
+      {
+        label: "Scheduled",
+        value: record.scheduledDate.toLocaleString("en-AU", {
+          dateStyle: "medium",
+          timeZone: "Australia/Sydney",
+        }),
+      },
+    ])
+    await db.maintenanceRecord.update({ where: { id: record.id }, data: { dueReminderSentAt: now } })
+    sent++
+  }
+
+  return { sent, checked: records.length }
+}
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization")
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new Response("Unauthorized", { status: 401 })
+  }
+
+  const now = new Date()
+  const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_HOURS * 60 * 60 * 1000)
+
+  const [pickupPush, returnReminders, maintenanceReminders] = await Promise.all([
+    sendPickupPushReminders(now, windowEnd),
+    sendReturnReminders(now, windowEnd),
+    sendMaintenanceDueReminders(now, windowEnd),
+  ])
+
+  return NextResponse.json({ pickupPush, returnReminders, maintenanceReminders })
 }

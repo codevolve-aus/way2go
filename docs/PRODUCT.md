@@ -116,17 +116,27 @@ Every route under `/admin` requires an approved Google sign-in (§7). Each modul
   sections for that document and writes a `LegalDocumentRevision` snapshot for audit/
   history — there's no way to view a past revision's content in the UI yet, only that a
   revision exists.
-- **Settings** — five tabs, mixed real/stub:
-  - *Company* — form UI only, **not persisted** ("Save Changes" is disabled).
-  - *Locations* — "coming soon" placeholder; branch data (`Location` model) is real and
-    used everywhere on the public site, but there's no admin UI to manage it (edits
-    require direct DB access).
-  - *Staff* — "coming soon" placeholder; the `Staff` model exists in the schema but has
-    **zero references anywhere in the app code** — fully dead/unused.
-  - *Notifications* — Push Notifications toggle is real (subscribes this browser via
-    `PushSubscription`, feeds the cron reminder job). Email notification toggles are UI
-    only, not wired to anything.
-  - *Users* (admin-only) — real: approve/reject Google sign-ins pending in `UserApproval`.
+- **Settings** — four tabs, all real:
+  - *Company* — name/ABN/phone/email/address, persisted as a single JSON blob in the
+    `Setting` table (key `company_details`), same pattern as pricing rules.
+  - *Locations* — full CRUD (add/edit/deactivate-reactivate) over the `Location` model,
+    which is also read on the public site (branch picker, footer, contact page). Soft
+    delete only (`isActive` toggle) — `Booking.pickupLocation` is a plain string, not a
+    relation, so deactivating a location never touches historical bookings.
+  - *Notifications* — Push Notifications toggle subscribes this browser via
+    `PushSubscription`, feeds the cron reminder job. Email Notifications are 5
+    admin-configurable toggles (`Setting` key `notification_prefs`,
+    `src/lib/notifications.ts`/`notifications-actions.ts`) gating **internal team email
+    alerts** (sent to `CONTACT_EMAIL`/`ADMIN_EMAIL`, not the customer) — distinct from
+    the customer-facing transactional emails (contract, enquiry) which always send
+    regardless of these prefs: Booking Confirmed (on status → CONFIRMED), Contract Ready
+    (on contract send), Payment Received (on payment record), Return Reminder and
+    Maintenance Due (both cron-driven, `api/cron/booking-reminders`, same daily job as
+    the pickup push reminder, deduped via `Booking.returnReminderSentAt` /
+    `MaintenanceRecord.dueReminderSentAt`).
+  - *Users* (admin-only) — real: approve/reject Google sign-ins pending in `UserApproval`,
+    including role assignment. This is the actual access-control mechanism; there is no
+    separate "Staff" tab — the `Staff` model in the schema is unrelated and unused.
 
 ## 4. Core business flow: the rental lifecycle
 

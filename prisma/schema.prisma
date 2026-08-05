@@ -164,6 +164,7 @@ model Booking {
   contract         Contract?
   payments         Payment[]
   pickupReminderSentAt DateTime?
+  returnReminderSentAt DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 }
@@ -381,6 +382,7 @@ model MaintenanceRecord {
   cost              Float?
   vendor            String?
   status            MaintenanceStatus @default(SCHEDULED)
+  dueReminderSentAt DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
