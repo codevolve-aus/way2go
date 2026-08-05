@@ -29,6 +29,7 @@ export const metadata: Metadata = {
     title: "WayZo",
   },
   icons: {
+    icon: [{ url: "/icons/icon.svg" }],
     apple: [{ url: "/icons/icon.svg" }],
   },
 };
