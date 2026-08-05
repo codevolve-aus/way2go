@@ -98,7 +98,7 @@ Every route under `/admin` requires an approved Google sign-in (§7). Each modul
   override, one default per category), Extras (line-item add-ons — model exists, always
   passed as an empty array from `page.tsx`, so the UI tab is currently non-functional),
   Discount Codes (create/activate/deactivate, % or flat, usage limit, expiry), Pricing
-  Rules (day-of-week surcharge grid, Peak Periods list, service fee %, tax %, minimum
+  Rules (day-of-week multiplier grid, Peak Periods list, service fee %, tax %, minimum
   rental days) with a live preview calculator.
 - **Payments** — record a payment against a booking (deposit/rental fee/extra/damage/fuel/
   late-return/refund, cash/card/bank transfer/online). Create-only — no edit or refund
@@ -177,10 +177,14 @@ Layers, applied in order:
    (`cheapestBaseRate`), billed in true 24-hour periods from the actual pickup timestamp
    (`billableDaysBetween`), not calendar nights — a 2pm Monday → 3pm Wednesday rental
    bills as 3 days, matching how rental counters bill a late return.
-3. **Day-of-week surcharge** — per-night %, independently configurable for each of
-   Sun–Sat (`PricingRules.dayOfWeekSurchargePct`), defaults to Fri/Sat +15%.
+3. **Day-of-week multiplier** — per-night multiplier, independently configurable for each
+   of Sun–Sat (`PricingRules.dayOfWeekMultiplier`; 1.0 = no change, e.g. 0.9 discounts a
+   weekday 10% to drive utilization, 1.15 adds a weekend premium), defaults to Fri/Sat
+   ×1.15 and every other day ×1.0. Rules saved before this became a multiplier (a
+   `dayOfWeekSurchargePct` map) are converted on read (`pct -> 1 + pct/100`) so existing
+   admin config survives the upgrade.
 4. **Peak Period surcharge** — admin-managed list of named date ranges with a % surcharge
-   (`PricingRules.peakPeriods`), stacks additively with the day-of-week surcharge on the
+   (`PricingRules.peakPeriods`), stacks additively with the day-of-week adjustment on the
    same night; where two peak periods overlap the same night, the higher one applies
    rather than stacking further.
 5. **Discount** — from a `DiscountCode` (% or flat amount, checked for active/expired/

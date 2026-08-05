@@ -148,10 +148,19 @@ function PriceEstimateCard({ result, isPending }: { result: PriceEstimateResult 
           </span>
           <span>{formatCurrency(breakdown.baseSubtotal)}</span>
         </div>
-        {breakdown.weekendSurcharge > 0 && (
-          <div className="flex justify-between text-muted-foreground">
-            <span>Day-of-week surcharge</span>
-            <span>+{formatCurrency(breakdown.weekendSurcharge)}</span>
+        {breakdown.dayOfWeekAdjustment !== 0 && (
+          <div
+            className={
+              breakdown.dayOfWeekAdjustment < 0
+                ? "flex justify-between text-green-600 dark:text-green-400"
+                : "flex justify-between text-muted-foreground"
+            }
+          >
+            <span>Day-of-week pricing</span>
+            <span>
+              {breakdown.dayOfWeekAdjustment < 0 ? "-" : "+"}
+              {formatCurrency(Math.abs(breakdown.dayOfWeekAdjustment))}
+            </span>
           </div>
         )}
         {breakdown.peakSurcharge > 0 && (

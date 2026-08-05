@@ -11,11 +11,28 @@ import {
 
 const PRICING_RULES_KEY = "pricing_rules"
 
+// Rules saved before the day-of-week surcharge became a multiplier stored a
+// `dayOfWeekSurchargePct` map instead of `dayOfWeekMultiplier` — convert it
+// (pct -> 1 + pct / 100) so existing admin configuration isn't silently
+// reset to the defaults on first load after the upgrade.
+function migrateStoredRules(stored: Record<string, unknown>): Partial<PricingRules> {
+  if (!stored.dayOfWeekMultiplier && stored.dayOfWeekSurchargePct) {
+    const legacyPct = stored.dayOfWeekSurchargePct as Record<number, number>
+    stored = {
+      ...stored,
+      dayOfWeekMultiplier: Object.fromEntries(
+        Object.entries(legacyPct).map(([day, pct]) => [day, 1 + pct / 100])
+      ),
+    }
+  }
+  return stored as Partial<PricingRules>
+}
+
 export async function getPricingRules(): Promise<PricingRules> {
   try {
     const row = await db.setting.findUnique({ where: { key: PRICING_RULES_KEY } })
     if (!row) return DEFAULT_PRICING_RULES
-    return { ...DEFAULT_PRICING_RULES, ...JSON.parse(row.value) }
+    return { ...DEFAULT_PRICING_RULES, ...migrateStoredRules(JSON.parse(row.value)) }
   } catch {
     return DEFAULT_PRICING_RULES
   }

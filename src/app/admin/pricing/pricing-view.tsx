@@ -345,10 +345,19 @@ function PricingPreview({ categories }: { categories: CategoryOption[] }) {
               </span>
               <span>{formatCurrency(result.breakdown.baseSubtotal)}</span>
             </div>
-            {result.breakdown.weekendSurcharge > 0 && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Day-of-week surcharge ({result.breakdown.weekendNights} night(s))</span>
-                <span>+{formatCurrency(result.breakdown.weekendSurcharge)}</span>
+            {result.breakdown.dayOfWeekAdjustment !== 0 && (
+              <div
+                className={
+                  result.breakdown.dayOfWeekAdjustment < 0
+                    ? "flex justify-between text-green-600 dark:text-green-400"
+                    : "flex justify-between text-muted-foreground"
+                }
+              >
+                <span>Day-of-week pricing ({result.breakdown.dayOfWeekAdjustedNights} night(s))</span>
+                <span>
+                  {result.breakdown.dayOfWeekAdjustment < 0 ? "-" : "+"}
+                  {formatCurrency(Math.abs(result.breakdown.dayOfWeekAdjustment))}
+                </span>
               </div>
             )}
             {result.breakdown.peakSurcharge > 0 && (
@@ -479,10 +488,10 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
   const [rulesForm, setRulesForm] = useState(pricingRules)
   const [isSavingRules, startRulesTransition] = useTransition()
 
-  function setDayOfWeekPct(day: number, pct: number) {
+  function setDayOfWeekMultiplier(day: number, multiplier: number) {
     setRulesForm((f) => ({
       ...f,
-      dayOfWeekSurchargePct: { ...f.dayOfWeekSurchargePct, [day]: pct },
+      dayOfWeekMultiplier: { ...f.dayOfWeekMultiplier, [day]: multiplier },
     }))
   }
 
@@ -854,9 +863,10 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
                 <CardHeader className="border-b border-border pb-4">
                   <CardTitle className="text-base font-medium">Day-of-Week Pricing</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Per-night surcharge added on top of the base rate, by day of week —
-                    set Friday/Saturday for a classic weekend bump, or price every day
-                    individually.
+                    Multiplier applied to the base rate, by day of week — 1.00 means
+                    no change, below 1.00 discounts that day (e.g. 0.90 for a 10%
+                    weekday discount to drive utilization), above 1.00 adds a premium
+                    (e.g. 1.15 for a classic weekend bump).
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -868,15 +878,15 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
                           <Input
                             type="number"
                             min="0"
-                            step="1"
+                            step="0.05"
                             className="pr-6"
-                            value={rulesForm.dayOfWeekSurchargePct[d.value] ?? 0}
+                            value={rulesForm.dayOfWeekMultiplier[d.value] ?? 1}
                             onChange={(e) =>
-                              setDayOfWeekPct(d.value, parseFloat(e.target.value) || 0)
+                              setDayOfWeekMultiplier(d.value, parseFloat(e.target.value) || 0)
                             }
                           />
                           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                            %
+                            ×
                           </span>
                         </div>
                       </div>
@@ -891,7 +901,7 @@ export function PricingView({ rateCards, extras, discountCodes, categories, pric
                     <CardTitle className="text-base font-medium">Peak Periods</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
                       Extra surcharge for named date ranges — holidays, long weekends,
-                      school breaks. Stacks with the day-of-week surcharge above; where
+                      school breaks. Stacks with the day-of-week pricing above; where
                       two peak periods overlap the same night, the higher one applies.
                     </p>
                   </div>

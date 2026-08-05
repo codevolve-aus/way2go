@@ -65,8 +65,12 @@ function priceEstimateRows(breakdown: PriceBreakdown, discountApplied: boolean) 
       value: formatCurrency(breakdown.baseSubtotal),
     },
   ]
-  if (breakdown.weekendSurcharge > 0) {
-    rows.push({ label: "Day-of-week surcharge", value: `+${formatCurrency(breakdown.weekendSurcharge)}` })
+  if (breakdown.dayOfWeekAdjustment !== 0) {
+    const sign = breakdown.dayOfWeekAdjustment < 0 ? "-" : "+"
+    rows.push({
+      label: "Day-of-week pricing",
+      value: `${sign}${formatCurrency(Math.abs(breakdown.dayOfWeekAdjustment))}`,
+    })
   }
   if (breakdown.peakSurcharge > 0) {
     rows.push({ label: "Peak season surcharge", value: `+${formatCurrency(breakdown.peakSurcharge)}` })
@@ -88,8 +92,12 @@ function priceEstimateBox(breakdown: PriceBreakdown, discountApplied: boolean) {
       value: formatCurrency(breakdown.baseSubtotal),
     },
   ]
-  if (breakdown.weekendSurcharge > 0) {
-    lines.push({ label: "Day-of-week surcharge", value: `+${formatCurrency(breakdown.weekendSurcharge)}` })
+  if (breakdown.dayOfWeekAdjustment !== 0) {
+    const sign = breakdown.dayOfWeekAdjustment < 0 ? "-" : "+"
+    lines.push({
+      label: "Day-of-week pricing",
+      value: `${sign}${formatCurrency(Math.abs(breakdown.dayOfWeekAdjustment))}`,
+    })
   }
   if (breakdown.peakSurcharge > 0) {
     lines.push({ label: "Peak season surcharge", value: `+${formatCurrency(breakdown.peakSurcharge)}` })
