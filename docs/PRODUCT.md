@@ -98,8 +98,8 @@ Every route under `/admin` requires an approved Google sign-in (§7). Each modul
   override, one default per category), Extras (line-item add-ons — model exists, always
   passed as an empty array from `page.tsx`, so the UI tab is currently non-functional),
   Discount Codes (create/activate/deactivate, % or flat, usage limit, expiry), Pricing
-  Rules (day-of-week multiplier grid, Peak Periods list, service fee %, tax %, minimum
-  rental days) with a live preview calculator.
+  Rules (day-of-week multiplier grid, Peak Periods list, Length-of-Stay Discount tiers,
+  service fee %, tax %, minimum rental days) with a live preview calculator.
 - **Payments** — record a payment against a booking (deposit/rental fee/extra/damage/fuel/
   late-return/refund, cash/card/bank transfer/online). Create-only — no edit or refund
   action beyond adding a new REFUND-type payment row.
@@ -230,12 +230,12 @@ Rules.
 - **Damage & Maintenance**: `DamageReport`, `MaintenanceRecord`.
 - **Operational**: `CalendarBlock` (vehicle-level date blocks — model exists, no admin
   action currently creates one, the Calendar page's "Block Dates" button is a stub),
-  `Location` (branch data, no admin CRUD — see §3).
+  `Location` (branch data, full admin CRUD — see §3).
 - **Auth**: `UserApproval` (email/status/role gate for admin access — see §7). `Staff`
   model exists, **completely unused** in app code.
-- **Misc**: `Setting` (generic key-value store, currently used only for `pricing_rules`),
-  `PushSubscription` (web push endpoints), `LegalDocument` / `LegalDocumentSection` /
-  `LegalDocumentRevision`.
+- **Misc**: `Setting` (generic key-value store — `pricing_rules`, `company_details`,
+  `notification_prefs`), `PushSubscription` (web push endpoints), `LegalDocument` /
+  `LegalDocumentSection` / `LegalDocumentRevision`.
 
 ## 7. Integrations & infrastructure
 
@@ -289,7 +289,6 @@ Rules.
 - **Schema has several unused/half-wired fields** — don't assume something is live just
   because it's in `schema.prisma`. Confirmed currently unused or UI-stub only: `Staff`
   model, `Invoice` model, `Extra`/`BookingExtra` (schema exists, no admin management UI),
-  `CalendarBlock` creation (Calendar page's "Block Dates" button), `Location` admin CRUD,
-  Settings → Company persistence, Settings → Email notification toggles, Contracts list →
+  `CalendarBlock` creation (Calendar page's "Block Dates" button), Contracts list →
   "Download PDF" (PDF generation only happens via the Bookings → Send Contract Email
   flow). Re-verify this list before relying on it — it may change as gaps get filled in.
